@@ -39,6 +39,11 @@ export interface ApiClient {
 
 export function createApiClient(baseUrl: string): ApiClient {
   function buildUrl(path: string, params?: Record<string, string>): string {
+    if (!baseUrl) {
+      if (!params) return path
+      const qs = new URLSearchParams(params).toString()
+      return qs ? `${path}?${qs}` : path
+    }
     const url = new URL(path, baseUrl)
     if (params) {
       Object.entries(params).forEach(([k, v]) => url.searchParams.set(k, v))
