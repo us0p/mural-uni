@@ -18,7 +18,6 @@ export interface LoginResponse {
   ra?: string
   roleId: number
   roleName: string
-  permissions: string[]
 }
 
 export interface UserResponse {
@@ -48,36 +47,6 @@ export interface UserRequest {
 }
 
 export interface RoleResponse {
-  id: number
-  name: string
-}
-
-export interface RolePageResponse {
-  content: RoleResponse[]
-  page: number
-  size: number
-  totalElements: number
-  totalPages: number
-}
-
-export interface RoleRequest {
-  name: string
-}
-
-export interface RolePermissionResponse {
-  id: number
-  roleId: number
-  roleName: string
-  permissionId: number
-  permissionName: string
-}
-
-export interface RolePermissionRequest {
-  roleId: number
-  permissionId: number
-}
-
-export interface PermissionObjectResponse {
   id: number
   name: string
 }
@@ -136,32 +105,26 @@ export interface DocumentResponse {
   fileSize: number
   bucketUrl: string
   knowledgeBase: boolean
+  isPublic: boolean
+  recipientId?: number
+  recipientUsername?: string
 }
 
-export interface UiItemResponse {
-  name: string
+export interface AlunoStatsResponse {
+  eventsAttended: number
+  daysOnPlatform: number
 }
 
-export interface UiItemRequest {
-  name: string
-}
-
-export interface UiPermissionObjectResponse {
-  id: number
-  uiItemName: string
-  permissionId: number
-  permissionName: string
-}
-
-export interface UiPermissionObjectRequest {
-  uiItemName: string
-  permissionId: number
+export interface NoticeWithPresenceResponse {
+  notice: NoticeResponse
+  attended: boolean
 }
 
 export interface ChatSource {
   documentId: number
   fileName: string
   chunkIndex: number
+  isPublic: boolean
 }
 
 export interface ChatRequest {

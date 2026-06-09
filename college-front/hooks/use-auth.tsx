@@ -10,19 +10,19 @@ import {
 } from 'react'
 import { login as apiLogin } from '@/lib/api/auth'
 import { apiClient } from '@/lib/api/client'
-import { getUiPermissionObjects } from '@/lib/api/ui-items'
-import type { LoginResponse, UserResponse, UiPermissionObjectResponse } from '@/lib/api/types'
+import type { LoginResponse, UserResponse } from '@/lib/api/types'
 
 const USER_KEY = 'auth_user'
 
 interface AuthContextType {
   user: UserResponse | null
+  role: string | null
   isLoading: boolean
   isAdmin: boolean
+  isProfessor: boolean
+  isAluno: boolean
   login: (username: string, password: string) => Promise<void>
   logout: () => void
-  hasPermission: (permissionName: string) => boolean
-  canAccessUiItem: (uiItemName: string) => boolean
 }
 
 const AuthContext = createContext<AuthContextType | null>(null)
@@ -42,12 +42,10 @@ function clearStorage() {
 }
 
 export function AuthProvider({ children }: { children: ReactNode }) {
-  const [user, setUser]                   = useState<UserResponse | null>(null)
-  const [permissions, setPermissions]     = useState<string[]>([])
-  const [uiPermissions, setUiPermissions] = useState<UiPermissionObjectResponse[]>([])
-  const [isLoading, setIsLoading]         = useState(true)
+  const [user, setUser]       = useState<UserResponse | null>(null)
+  const [role, setRole]       = useState<string | null>(null)
+  const [isLoading, setIsLoading] = useState(true)
 
-  // On mount: restore session via httpOnly cookie (/api/auth/me validates it)
   useEffect(() => {
     const storedUser = readLocal<UserResponse>(USER_KEY)
     if (!storedUser) {
@@ -55,11 +53,9 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       return
     }
     apiClient.get<LoginResponse>('/api/auth/me')
-      .then(async (me) => {
-        const uiPerms = await getUiPermissionObjects()
+      .then((me) => {
         setUser(storedUser)
-        setPermissions(me.permissions)
-        setUiPermissions(uiPerms)
+        setRole(me.roleName)
       })
       .catch(() => {
         clearStorage()
@@ -80,13 +76,9 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       roleName:    result.roleName,
     }
 
-    const uiPerms = await getUiPermissionObjects()
-
     setUser(currentUser)
-    setPermissions(result.permissions)
-    setUiPermissions(uiPerms)
+    setRole(result.roleName)
 
-    // Persist only the user object for session restoration — permissions re-fetched from /me
     localStorage.setItem(USER_KEY, JSON.stringify(currentUser))
   }, [])
 
@@ -94,30 +86,16 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     void apiClient.post('/api/auth/logout', {})?.catch?.(() => {})
     clearStorage()
     setUser(null)
-    setPermissions([])
-    setUiPermissions([])
+    setRole(null)
   }, [])
 
-  const hasPermission = useCallback(
-    (permissionName: string): boolean => permissions.includes(permissionName),
-    [permissions],
-  )
-
-  const canAccessUiItem = useCallback(
-    (uiItemName: string): boolean => {
-      if (!user) return false
-      const required = uiPermissions.filter((p) => p.uiItemName === uiItemName)
-      if (required.length === 0) return true
-      return required.every((r) => permissions.includes(r.permissionName))
-    },
-    [user, uiPermissions, permissions],
-  )
-
-  const isAdmin = permissions.includes('admin')
+  const isAdmin     = role === 'admin'
+  const isProfessor = role === 'professor'
+  const isAluno     = role === 'aluno'
 
   return (
     <AuthContext.Provider
-      value={{ user, isLoading, isAdmin, login, logout, hasPermission, canAccessUiItem }}
+      value={{ user, role, isLoading, isAdmin, isProfessor, isAluno, login, logout }}
     >
       {children}
     </AuthContext.Provider>

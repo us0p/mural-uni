@@ -1,6 +1,9 @@
 /** @type {import('next').NextConfig} */
 const isDev = process.env.NODE_ENV === 'development'
+// Public URL used by the browser and CSP headers (e.g. http://localhost:8080)
 const apiUrl = process.env.NEXT_PUBLIC_API_URL ?? 'http://localhost:8080'
+// Internal URL used by the server-side proxy — set to http://app:8080 in Docker
+const internalApiUrl = process.env.API_URL ?? apiUrl
 
 const nextConfig = {
   typescript: {
@@ -13,7 +16,7 @@ const nextConfig = {
     return [
       {
         source: '/api/:path*',
-        destination: `${apiUrl}/api/:path*`,
+        destination: `${internalApiUrl}/api/:path*`,
       },
     ]
   },

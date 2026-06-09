@@ -97,3 +97,8 @@ export function createApiClient(baseUrl: string): ApiClient {
 }
 
 export const apiClient = createApiClient(API_URL)
+
+export function getErrorMessage(err: unknown, fallback: string): string {
+  if (err instanceof ApiError) return err.message
+  return fallback
+}

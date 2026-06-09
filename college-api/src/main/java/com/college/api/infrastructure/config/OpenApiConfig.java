@@ -17,8 +17,8 @@ public class OpenApiConfig {
         return new OpenAPI()
                 .info(new Info()
                         .title("College Institution API")
-                        .description("REST API for college institution management. " +
-                                "Handles users, roles, permission objects, posts, and AI-powered document storage with vector embeddings.")
+                        .description("REST API for college institution management. "
+                                + "Handles users, roles, permission objects, posts, and AI-powered document storage with vector embeddings.")
                         .version("1.0.0"))
                 .addSecurityItem(new SecurityRequirement().addList(schemeName))
                 .components(new Components()

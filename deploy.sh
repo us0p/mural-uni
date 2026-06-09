@@ -85,7 +85,7 @@ docker compose up -d --build $NO_CACHE
 # ── Health wait ──────────────────────────────────────────────────────────────
 
 info "Waiting for services to become healthy..."
-TIMEOUT=60
+TIMEOUT=120
 ELAPSED=0
 INTERVAL=3
 

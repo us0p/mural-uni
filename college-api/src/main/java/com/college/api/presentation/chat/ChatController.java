@@ -9,13 +9,12 @@ import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.ProblemDetail;
-import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
 
-@Tag(name = "Chat", description = "RAG-powered LLM chat grounded in the knowledge base")
+@Tag(name = "Chat", description = "Knowledge base search via vector similarity")
 @RestController
 @RequestMapping("/api/chat")
 @RequiredArgsConstructor
@@ -25,12 +24,11 @@ public class ChatController {
 
     @Operation(
             summary = "Ask a question",
-            description = "Retrieves the most relevant document chunks from the knowledge base, injects them as context into a system prompt, and forwards the question to the configured LLM.")
-    @ApiResponse(responseCode = "200", description = "LLM answer with source attribution")
+            description = "Embeds the question, retrieves the most similar document chunks from the knowledge base, and returns the matching text. Returns a fallback message if no relevant chunks are found.")
+    @ApiResponse(responseCode = "200", description = "Matching sections with source attribution")
     @ApiResponse(responseCode = "400", description = "Validation error",
             content = @Content(mediaType = "application/problem+json",
                     schema = @Schema(implementation = ProblemDetail.class)))
-    @PreAuthorize("hasAuthority('admin')")
     @PostMapping
     public ChatResponse chat(@RequestBody @Valid ChatRequest request) {
         int chunks = request.contextChunks() != null ? request.contextChunks() : 5;

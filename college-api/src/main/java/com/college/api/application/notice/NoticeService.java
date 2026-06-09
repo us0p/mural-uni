@@ -1,26 +1,40 @@
 package com.college.api.application.notice;
 
 import com.college.api.application.exception.ResourceNotFoundException;
+import com.college.api.domain.email.EmailPort;
 import com.college.api.domain.notice.Notice;
 import com.college.api.domain.notice.NoticeCategory;
 import com.college.api.domain.notice.NoticeCategoryRepository;
 import com.college.api.domain.notice.NoticePage;
 import com.college.api.domain.notice.NoticeRepository;
+import com.college.api.domain.notice.NoticeSubscriptionRepository;
+import com.college.api.domain.notice.NoticeSubscriptionRepository.SubscriberInfo;
 import com.college.api.domain.user.User;
 import com.college.api.domain.user.UserRepository;
 import lombok.RequiredArgsConstructor;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.time.OffsetDateTime;
+import java.util.List;
 
 @Service
 @RequiredArgsConstructor
 public class NoticeService {
 
+    private static final Logger log = LoggerFactory.getLogger(NoticeService.class);
+
     private final NoticeRepository noticeRepository;
     private final UserRepository userRepository;
     private final NoticeCategoryRepository noticeCategoryRepository;
+    private final NoticeSubscriptionRepository noticeSubscriptionRepository;
+    private final EmailPort emailPort;
+
+    @Value("${app.frontend-url}")
+    private String frontendUrl;
 
     @Transactional(readOnly = true)
     public NoticePage findFiltered(String searchParam, int page, int size) {
@@ -49,7 +63,37 @@ public class NoticeService {
                 .createdAt(now)
                 .updatedAt(now)
                 .build();
-        return noticeRepository.save(notice);
+        Notice saved = noticeRepository.save(notice);
+        try {
+            sendNoticeNotifications(saved);
+        } catch (Exception e) {
+            log.warn("Failed to dispatch notice notifications for notice {}: {}", saved.getId(), e.getClass().getSimpleName());
+        }
+        return saved;
+    }
+
+    private void sendNoticeNotifications(Notice notice) {
+        List<SubscriberInfo> subscribers =
+                noticeSubscriptionRepository.findSubscribersByCategoryId(notice.getCategory().getId());
+        if (subscribers.isEmpty()) return;
+
+        String noticeUrl = frontendUrl + "/blog/" + notice.getId();
+        String preferencesUrl = frontendUrl + "/aluno/preferencias";
+
+        for (SubscriberInfo subscriber : subscribers) {
+            try {
+                emailPort.sendNoticeNotificationEmail(
+                        subscriber.email(),
+                        subscriber.username(),
+                        notice.getTitle(),
+                        notice.getCategory().getName(),
+                        noticeUrl,
+                        preferencesUrl
+                );
+            } catch (Exception e) {
+                log.warn("Failed to send notice notification to '{}': {}", subscriber.email(), e.getClass().getSimpleName());
+            }
+        }
     }
 
     @Transactional

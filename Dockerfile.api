@@ -1,6 +1,6 @@
 FROM public.ecr.aws/docker/library/maven:3.9-eclipse-temurin-21 AS build
 WORKDIR /app
-COPY college-api/pom.xml .
+COPY college-api/pom.xml college-api/checkstyle.xml ./
 RUN mvn dependency:go-offline -q
 COPY college-api/src ./src
 RUN mvn package -DskipTests -q

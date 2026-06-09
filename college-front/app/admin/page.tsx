@@ -30,14 +30,14 @@ export default function AdminDashboard() {
     Promise.all([
       getNotices({ size: 3 }),
       getUsers({ size: 1 }),
-      getRoles({ size: 1 }),
+      getRoles(),
       getDocuments(),
     ])
       .then(([notices, users, roles, docs]) => {
         setStats({
           notices: notices.totalElements,
           users: users.totalElements,
-          roles: roles.totalElements,
+          roles: roles.length,
           documents: docs.length,
           knowledgeBaseDocs: docs.filter((d) => d.knowledgeBase).length,
         })

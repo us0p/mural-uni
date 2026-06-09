@@ -31,7 +31,7 @@ public class UserController {
 
     @Operation(summary = "List users with optional search and pagination")
     @ApiResponse(responseCode = "200", description = "OK")
-    @PreAuthorize("hasAuthority('admin')")
+    @PreAuthorize("hasAnyAuthority('admin', 'professor')")
     @GetMapping
     public UserPageResponse findAll(
             @RequestParam(name = "search_param", required = false) @Size(max = 200) String searchParam,
@@ -41,12 +41,24 @@ public class UserController {
         return UserPageResponse.from(service.findFiltered(searchParam, page, size));
     }
 
+    @Operation(summary = "List alunos with optional search by username, email, or RA")
+    @ApiResponse(responseCode = "200", description = "OK")
+    @PreAuthorize("hasAnyAuthority('admin', 'professor')")
+    @GetMapping("/students")
+    public UserPageResponse findStudents(
+            @RequestParam(name = "search_param", required = false) @Size(max = 200) String searchParam,
+            @RequestParam(defaultValue = "0") @PositiveOrZero int page,
+            @RequestParam(defaultValue = "20") @Max(100) int size
+    ) {
+        return UserPageResponse.from(service.findStudents(searchParam, page, size));
+    }
+
     @Operation(summary = "Get a user by ID")
     @ApiResponse(responseCode = "200", description = "User found")
     @ApiResponse(responseCode = "404", description = "User not found",
             content = @Content(mediaType = "application/problem+json",
                     schema = @Schema(implementation = ProblemDetail.class)))
-    @PreAuthorize("hasAuthority('admin')")
+    @PreAuthorize("hasAnyAuthority('admin', 'professor')")
     @GetMapping("/{id}")
     public UserResponse findById(@PathVariable Integer id) {
         return UserResponse.from(service.findById(id));

@@ -17,4 +17,10 @@ public class NoOpEmailAdapter implements EmailPort {
     public void sendPasswordResetEmail(String toEmail, String username, String resetUrl) {
         log.warn("SES not configured — skipping password-reset email to '{}'. URL: {}", toEmail, resetUrl);
     }
+
+    @Override
+    public void sendNoticeNotificationEmail(String toEmail, String username, String noticeTitle,
+            String categoryName, String noticeUrl, String preferencesUrl) {
+        log.warn("Email not configured — skipping notice notification to '{}'. Notice: '{}'", toEmail, noticeTitle);
+    }
 }

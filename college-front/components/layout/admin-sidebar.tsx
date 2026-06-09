@@ -7,7 +7,6 @@ import {
   LayoutDashboard,
   FileText,
   Users,
-  Shield,
   LogOut,
   ChevronLeft,
   Newspaper,
@@ -16,22 +15,18 @@ import {
 import { cn } from '@/lib/utils'
 import { useAuth } from '@/hooks/use-auth'
 import { Button } from '@/components/ui/button'
-import type { UiItemName } from '@/lib/ui-item-routes'
 
-const sidebarLinks: { href: string; label: string; icon: React.ElementType; uiItemName: UiItemName }[] = [
-  { href: '/admin', label: 'Dashboard', icon: LayoutDashboard, uiItemName: 'admin_dashboard' },
-  { href: '/admin/posts', label: 'Avisos', icon: Newspaper, uiItemName: 'admin_blog_post' },
-  { href: '/admin/categorias', label: 'Categorias', icon: Tag, uiItemName: 'admin_notice_categories' },
-  { href: '/admin/documentos', label: 'Documentos', icon: FileText, uiItemName: 'admin_documents' },
-  { href: '/admin/usuarios', label: 'Usuários', icon: Users, uiItemName: 'admin_users' },
-  { href: '/admin/grupos', label: 'Grupos de Acesso', icon: Shield, uiItemName: 'admin_access_groups' },
+const sidebarLinks: { href: string; label: string; icon: React.ElementType }[] = [
+  { href: '/admin', label: 'Dashboard', icon: LayoutDashboard },
+  { href: '/admin/posts', label: 'Avisos', icon: Newspaper },
+  { href: '/admin/categorias', label: 'Categorias', icon: Tag },
+  { href: '/admin/documentos', label: 'Documentos', icon: FileText },
+  { href: '/admin/usuarios', label: 'Usuários', icon: Users },
 ]
 
 export function AdminSidebar() {
   const pathname = usePathname()
-  const { user, logout, canAccessUiItem } = useAuth()
-
-  const visibleLinks = sidebarLinks.filter((link) => canAccessUiItem(link.uiItemName))
+  const { user, logout } = useAuth()
 
   return (
     <aside className="flex h-screen w-64 flex-col border-r border-sidebar-border bg-sidebar">
@@ -46,7 +41,7 @@ export function AdminSidebar() {
 
       {/* Navigation */}
       <nav className="flex-1 space-y-1 p-3">
-        {visibleLinks.map((link) => {
+        {sidebarLinks.map((link) => {
           const isActive = pathname === link.href
           return (
             <Link

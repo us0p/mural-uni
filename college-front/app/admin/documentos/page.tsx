@@ -1,8 +1,8 @@
 'use client'
 
-import { useEffect, useState, useCallback } from 'react'
+import { useEffect, useState, useCallback, useRef } from 'react'
 import {
-  Plus, Trash2, FileText, Search, Brain, AlertCircle, Download,
+  Plus, Trash2, FileText, Search, Brain, AlertCircle, Download, Lock, Unlock, GraduationCap, X,
 } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
@@ -21,7 +21,11 @@ import {
   AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle,
 } from '@/components/ui/alert-dialog'
 import { getDocuments, uploadDocument, deleteDocument } from '@/lib/api/documents'
-import type { DocumentResponse } from '@/lib/api/types'
+import { getStudents } from '@/lib/api/users'
+import { getErrorMessage } from '@/lib/api/client'
+import type { DocumentResponse, UserResponse } from '@/lib/api/types'
+
+const DEBOUNCE_MS = 300
 
 function formatBytes(bytes: number) {
   if (bytes < 1024) return `${bytes} B`
@@ -42,8 +46,17 @@ export default function AdminDocumentosPage() {
   const [file, setFile] = useState<File | null>(null)
   const [description, setDescription] = useState('')
   const [knowledgeBase, setKnowledgeBase] = useState(false)
+  const [isPublic, setIsPublic] = useState(false)
   const [isUploading, setIsUploading] = useState(false)
   const [uploadError, setUploadError] = useState<string | null>(null)
+
+  const [forStudent, setForStudent] = useState(false)
+  const [recipientId, setRecipientId] = useState<number | null>(null)
+  const [recipientUsername, setRecipientUsername] = useState('')
+  const [studentSearch, setStudentSearch] = useState('')
+  const [students, setStudents] = useState<UserResponse[]>([])
+  const [studentSearchLoading, setStudentSearchLoading] = useState(false)
+  const debounceRef = useRef<ReturnType<typeof setTimeout> | null>(null)
 
   const load = useCallback(async () => {
     setIsLoading(true)
@@ -59,6 +72,25 @@ export default function AdminDocumentosPage() {
 
   useEffect(() => { load() }, [load])
 
+  useEffect(() => {
+    if (!forStudent) return
+    if (debounceRef.current) clearTimeout(debounceRef.current)
+    debounceRef.current = setTimeout(async () => {
+      setStudentSearchLoading(true)
+      try {
+        const result = await getStudents(studentSearch || undefined)
+        setStudents(result.content)
+      } catch {
+        setStudents([])
+      } finally {
+        setStudentSearchLoading(false)
+      }
+    }, DEBOUNCE_MS)
+    return () => {
+      if (debounceRef.current) clearTimeout(debounceRef.current)
+    }
+  }, [studentSearch, forStudent])
+
   const filtered = documents.filter((d) =>
     d.fileName.toLowerCase().includes(searchQuery.toLowerCase()) ||
     (d.description ?? '').toLowerCase().includes(searchQuery.toLowerCase())
@@ -68,21 +100,57 @@ export default function AdminDocumentosPage() {
     setFile(null)
     setDescription('')
     setKnowledgeBase(false)
+    setIsPublic(false)
     setUploadError(null)
+    setForStudent(false)
+    setRecipientId(null)
+    setRecipientUsername('')
+    setStudentSearch('')
+    setStudents([])
     setIsUploadOpen(true)
+  }
+
+  const handleForStudentToggle = (checked: boolean) => {
+    setForStudent(checked)
+    if (checked) {
+      setKnowledgeBase(false)
+      setStudentSearch('')
+      setStudents([])
+    } else {
+      setRecipientId(null)
+      setRecipientUsername('')
+    }
+  }
+
+  const handleSelectStudent = (student: UserResponse) => {
+    setRecipientId(student.id)
+    setRecipientUsername(student.username)
+    setStudents([])
+    setStudentSearch('')
+  }
+
+  const handleClearRecipient = () => {
+    setRecipientId(null)
+    setRecipientUsername('')
+    setStudentSearch('')
+    setStudents([])
   }
 
   const handleUpload = async (e: React.FormEvent) => {
     e.preventDefault()
     if (!file) return
+    if (forStudent && !recipientId) {
+      setUploadError('Selecione um aluno destinatário.')
+      return
+    }
     setIsUploading(true)
     setUploadError(null)
     try {
-      await uploadDocument(file, description, knowledgeBase)
+      await uploadDocument(file, description, knowledgeBase, isPublic, recipientId ?? undefined)
       await load()
       setIsUploadOpen(false)
-    } catch {
-      setUploadError('Erro ao enviar o documento. Verifique o tipo e tamanho do arquivo.')
+    } catch (err) {
+      setUploadError(getErrorMessage(err, 'Erro ao enviar o documento. Verifique o tipo e tamanho do arquivo.'))
     } finally {
       setIsUploading(false)
     }
@@ -142,18 +210,20 @@ export default function AdminDocumentosPage() {
               <TableHead>Arquivo</TableHead>
               <TableHead className="hidden sm:table-cell">Tamanho</TableHead>
               <TableHead className="hidden sm:table-cell">Enviado por</TableHead>
+              <TableHead className="hidden md:table-cell">Destinatário</TableHead>
               <TableHead className="hidden md:table-cell">Base IA</TableHead>
+              <TableHead className="hidden md:table-cell">Acesso</TableHead>
               <TableHead className="text-right">Ações</TableHead>
             </TableRow>
           </TableHeader>
           <TableBody>
             {isLoading ? (
               <TableRow>
-                <TableCell colSpan={5} className="py-8 text-center text-muted-foreground">Carregando...</TableCell>
+                <TableCell colSpan={7} className="py-8 text-center text-muted-foreground">Carregando...</TableCell>
               </TableRow>
             ) : filtered.length === 0 ? (
               <TableRow>
-                <TableCell colSpan={5} className="py-8 text-center">
+                <TableCell colSpan={7} className="py-8 text-center">
                   <FileText className="mx-auto h-12 w-12 text-muted-foreground/50" />
                   <p className="mt-2 text-muted-foreground">Nenhum documento encontrado.</p>
                 </TableCell>
@@ -180,6 +250,16 @@ export default function AdminDocumentosPage() {
                   {doc.username}
                 </TableCell>
                 <TableCell className="hidden md:table-cell">
+                  {doc.recipientUsername ? (
+                    <Badge variant="outline" className="border-blue-500 text-blue-600">
+                      <GraduationCap className="mr-1 h-3 w-3" />
+                      {doc.recipientUsername}
+                    </Badge>
+                  ) : (
+                    <span className="text-sm text-muted-foreground">—</span>
+                  )}
+                </TableCell>
+                <TableCell className="hidden md:table-cell">
                   {doc.knowledgeBase ? (
                     <Badge className="bg-purple-100 text-purple-800">
                       <Brain className="mr-1 h-3 w-3" />
@@ -189,10 +269,23 @@ export default function AdminDocumentosPage() {
                     <span className="text-sm text-muted-foreground">Não</span>
                   )}
                 </TableCell>
+                <TableCell className="hidden md:table-cell">
+                  {doc.isPublic ? (
+                    <Badge variant="outline" className="border-green-500 text-green-600">
+                      <Unlock className="mr-1 h-3 w-3" />
+                      Público
+                    </Badge>
+                  ) : (
+                    <Badge variant="outline" className="border-orange-500 text-orange-600">
+                      <Lock className="mr-1 h-3 w-3" />
+                      Restrito
+                    </Badge>
+                  )}
+                </TableCell>
                 <TableCell className="text-right">
                   <div className="flex justify-end gap-2">
                     <Button variant="ghost" size="icon" asChild>
-                      <a href={doc.bucketUrl} target="_blank" rel="noopener noreferrer" aria-label="Baixar">
+                      <a href={`${process.env.NEXT_PUBLIC_API_URL}/api/documents/${doc.id}/download`} target="_blank" rel="noopener noreferrer" aria-label="Baixar">
                         <Download className="h-4 w-4" />
                       </a>
                     </Button>
@@ -254,15 +347,101 @@ export default function AdminDocumentosPage() {
               />
             </div>
 
+            {/* For student toggle */}
             <div className="flex items-center justify-between rounded-lg border border-border p-3">
               <div className="space-y-0.5">
-                <Label htmlFor="knowledgeBase">Base de Conhecimento IA</Label>
-                <p className="text-xs text-muted-foreground">Usar como referência para o chatbot</p>
+                <Label htmlFor="forStudent">Destinar a um aluno</Label>
+                <p className="text-xs text-muted-foreground">Associar este documento a um aluno específico</p>
+              </div>
+              <Switch
+                id="forStudent"
+                checked={forStudent}
+                onCheckedChange={handleForStudentToggle}
+              />
+            </div>
+
+            {/* Student selector panel */}
+            {forStudent && (
+              <div className="space-y-2 rounded-lg border border-border p-3">
+                <Label>Aluno destinatário *</Label>
+                {recipientId ? (
+                  <div className="flex items-center justify-between rounded-md bg-accent/10 px-3 py-2">
+                    <div className="flex items-center gap-2">
+                      <GraduationCap className="h-4 w-4 text-accent" />
+                      <span className="text-sm font-medium">{recipientUsername}</span>
+                    </div>
+                    <Button type="button" variant="ghost" size="icon" className="h-6 w-6" onClick={handleClearRecipient}>
+                      <X className="h-3 w-3" />
+                    </Button>
+                  </div>
+                ) : (
+                  <>
+                    <div className="relative">
+                      <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
+                      <Input
+                        placeholder="Buscar por username, e-mail ou RA..."
+                        value={studentSearch}
+                        onChange={(e) => setStudentSearch(e.target.value)}
+                        className="pl-10"
+                      />
+                    </div>
+                    {(students.length > 0 || studentSearchLoading) && (
+                      <div className="max-h-48 overflow-y-auto rounded-md border border-border">
+                        {studentSearchLoading ? (
+                          <p className="px-3 py-4 text-center text-sm text-muted-foreground">Buscando...</p>
+                        ) : students.length === 0 ? (
+                          <p className="px-3 py-4 text-center text-sm text-muted-foreground">Nenhum aluno encontrado.</p>
+                        ) : students.map((s) => (
+                          <button
+                            key={s.id}
+                            type="button"
+                            onClick={() => handleSelectStudent(s)}
+                            className="flex w-full flex-col gap-0.5 px-3 py-2 text-left text-sm hover:bg-accent/10 focus:outline-none focus:bg-accent/10"
+                          >
+                            <span className="font-medium">{s.username}</span>
+                            <span className="text-xs text-muted-foreground">
+                              {s.email}{s.ra ? ` · RA: ${s.ra}` : ''}
+                            </span>
+                          </button>
+                        ))}
+                      </div>
+                    )}
+                    {!studentSearchLoading && students.length === 0 && studentSearch.trim() && (
+                      <p className="text-xs text-muted-foreground">Nenhum aluno encontrado para &quot;{studentSearch}&quot;.</p>
+                    )}
+                  </>
+                )}
+              </div>
+            )}
+
+            <div className="flex items-center justify-between rounded-lg border border-border p-3">
+              <div className="space-y-0.5">
+                <Label htmlFor="knowledgeBase" className={forStudent ? 'text-muted-foreground' : ''}>
+                  Base de Conhecimento IA
+                </Label>
+                <p className="text-xs text-muted-foreground">
+                  {forStudent
+                    ? 'Indisponível para documentos com destinatário'
+                    : 'Usar como referência para o chatbot'}
+                </p>
               </div>
               <Switch
                 id="knowledgeBase"
                 checked={knowledgeBase}
                 onCheckedChange={setKnowledgeBase}
+                disabled={forStudent}
+              />
+            </div>
+
+            <div className="flex items-center justify-between rounded-lg border border-border p-3">
+              <div className="space-y-0.5">
+                <Label htmlFor="isPublic">Visibilidade Pública</Label>
+                <p className="text-xs text-muted-foreground">Visível para usuários não autenticados</p>
+              </div>
+              <Switch
+                id="isPublic"
+                checked={isPublic}
+                onCheckedChange={setIsPublic}
               />
             </div>
 
@@ -288,7 +467,7 @@ export default function AdminDocumentosPage() {
           <AlertDialogHeader>
             <AlertDialogTitle>Confirmar exclusão</AlertDialogTitle>
             <AlertDialogDescription>
-              Tem certeza que deseja excluir &quot;{selected?.fileName}&quot;? O arquivo será removido do S3 e esta ação não pode ser desfeita.
+              Tem certeza que deseja excluir &quot;{selected?.fileName}&quot;? O arquivo será removido do armazenamento e esta ação não pode ser desfeita.
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>

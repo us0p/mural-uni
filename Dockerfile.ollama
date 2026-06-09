@@ -1,0 +1,10 @@
+FROM ollama/ollama:latest
+
+# Pull nomic-embed-text at build time so the model is ready on first container start
+RUN ollama serve & \
+    SERVER_PID=$! && \
+    until ollama list >/dev/null 2>&1; do sleep 1; done && \
+    ollama pull nomic-embed-text && \
+    kill $SERVER_PID
+
+EXPOSE 11434

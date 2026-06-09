@@ -4,13 +4,11 @@ import React from 'react'
 import { AdminSidebar } from '../admin-sidebar'
 
 const mockLogout = vi.fn()
-const mockCanAccessUiItem = vi.fn()
 
 vi.mock('@/hooks/use-auth', () => ({
   useAuth: () => ({
-    user: { id: 1, username: 'admin', email: 'admin@test.com', roleId: 1, roleName: 'Admin' },
+    user: { id: 1, username: 'admin', email: 'admin@test.com', roleId: 1, roleName: 'admin' },
     logout: mockLogout,
-    canAccessUiItem: mockCanAccessUiItem,
   }),
 }))
 
@@ -28,63 +26,32 @@ describe('AdminSidebar', () => {
     vi.clearAllMocks()
   })
 
-  it('renders all nav links when user can access every UI item', () => {
-    mockCanAccessUiItem.mockReturnValue(true)
-
+  it('renders all nav links', () => {
     render(<AdminSidebar />)
 
     expect(screen.getByText('Dashboard')).toBeInTheDocument()
     expect(screen.getByText('Avisos')).toBeInTheDocument()
+    expect(screen.getByText('Categorias')).toBeInTheDocument()
     expect(screen.getByText('Documentos')).toBeInTheDocument()
     expect(screen.getByText('Usuários')).toBeInTheDocument()
-    expect(screen.getByText('Grupos de Acesso')).toBeInTheDocument()
   })
 
-  it('hides links for UI items the user cannot access', () => {
-    mockCanAccessUiItem.mockImplementation(
-      (name: string) => name !== 'admin_users' && name !== 'admin_documents',
-    )
-
+  it('does not render Grupos de Acesso', () => {
     render(<AdminSidebar />)
 
-    expect(screen.getByText('Dashboard')).toBeInTheDocument()
-    expect(screen.getByText('Avisos')).toBeInTheDocument()
-    expect(screen.getByText('Grupos de Acesso')).toBeInTheDocument()
-    expect(screen.queryByText('Usuários')).not.toBeInTheDocument()
-    expect(screen.queryByText('Documentos')).not.toBeInTheDocument()
-  })
-
-  it('renders only the dashboard link when user has minimal access', () => {
-    mockCanAccessUiItem.mockImplementation((name: string) => name === 'admin_dashboard')
-
-    render(<AdminSidebar />)
-
-    expect(screen.getByText('Dashboard')).toBeInTheDocument()
-    expect(screen.queryByText('Avisos')).not.toBeInTheDocument()
-    expect(screen.queryByText('Documentos')).not.toBeInTheDocument()
-    expect(screen.queryByText('Usuários')).not.toBeInTheDocument()
     expect(screen.queryByText('Grupos de Acesso')).not.toBeInTheDocument()
   })
 
   it('renders the logged-in username in the footer', () => {
-    mockCanAccessUiItem.mockReturnValue(true)
-
     render(<AdminSidebar />)
 
     expect(screen.getByText('admin')).toBeInTheDocument()
   })
 
-  it('maps each sidebar link to the correct UI item name', () => {
-    mockCanAccessUiItem.mockReturnValue(false)
-
+  it('highlights the active link based on current pathname', () => {
     render(<AdminSidebar />)
 
-    // Verify canAccessUiItem is called with the expected UI item names
-    const calledWith = mockCanAccessUiItem.mock.calls.map((c) => c[0])
-    expect(calledWith).toContain('admin_dashboard')
-    expect(calledWith).toContain('admin_blog_post')
-    expect(calledWith).toContain('admin_documents')
-    expect(calledWith).toContain('admin_users')
-    expect(calledWith).toContain('admin_access_groups')
+    const dashboardLink = screen.getByText('Dashboard').closest('a')
+    expect(dashboardLink?.className).toContain('bg-sidebar-accent')
   })
 })

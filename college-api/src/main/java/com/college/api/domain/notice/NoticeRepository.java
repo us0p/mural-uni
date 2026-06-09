@@ -11,6 +11,7 @@ public interface NoticeRepository {
     long countActiveByCategoryAndCreatedAtAfter(String categoryName, OffsetDateTime after);
     long countActiveByCategory(String categoryName);
     Optional<String> findLatestActiveTitle();
+    List<Notice> findActiveByCategory(String categoryName);
     void deleteById(Integer id);
     boolean existsById(Integer id);
 }

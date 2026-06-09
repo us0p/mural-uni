@@ -10,20 +10,19 @@ import { AdminSidebar } from '@/components/layout/admin-sidebar'
 export default function AdminLayout({ children }: { children: React.ReactNode }) {
   const router = useRouter()
   const pathname = usePathname()
-  const { user, isLoading, canAccessUiItem } = useAuth()
+  const { user, isLoading, isAdmin, isProfessor } = useAuth()
   const [sidebarOpen, setSidebarOpen] = useState(false)
 
-  // Close mobile sidebar whenever the route changes
   useEffect(() => { setSidebarOpen(false) }, [pathname])
 
   useEffect(() => {
     if (isLoading) return
     if (!user) {
       router.push('/login')
-    } else if (!canAccessUiItem('admin_dashboard')) {
+    } else if (!isAdmin && !isProfessor) {
       router.push('/')
     }
-  }, [user, isLoading, canAccessUiItem, router])
+  }, [user, isLoading, isAdmin, isProfessor, router])
 
   if (isLoading) {
     return (
@@ -33,7 +32,7 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
     )
   }
 
-  if (!user || !canAccessUiItem('admin_dashboard')) return null
+  if (!user || (!isAdmin && !isProfessor)) return null
 
   return (
     <div className="flex min-h-screen bg-background">

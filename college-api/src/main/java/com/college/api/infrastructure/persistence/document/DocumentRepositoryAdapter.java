@@ -38,4 +38,9 @@ public class DocumentRepositoryAdapter implements DocumentRepository {
     public boolean existsById(Integer id) {
         return jpa.existsById(id);
     }
+
+    @Override
+    public List<Document> findAllByIsPublicTrue() {
+        return jpa.findAllByIsPublicTrue();
+    }
 }

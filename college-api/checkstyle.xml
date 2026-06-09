@@ -1,0 +1,51 @@
+<?xml version="1.0"?>
+<!DOCTYPE module PUBLIC
+        "-//Checkstyle//DTD Checkstyle Configuration 1.3//EN"
+        "https://checkstyle.org/dtds/configuration_1_3.dtd">
+<module name="Checker">
+    <property name="charset" value="UTF-8"/>
+    <property name="severity" value="warning"/>
+
+    <!-- No tab characters -->
+    <module name="FileTabCharacter"/>
+
+    <!-- No trailing whitespace -->
+    <module name="RegexpSingleline">
+        <property name="format" value="\s+$"/>
+        <property name="message" value="Line has trailing whitespace."/>
+    </module>
+
+    <!-- File ends with a newline -->
+    <module name="NewlineAtEndOfFile"/>
+
+    <module name="TreeWalker">
+        <!-- Correctness: string comparison must use equals(), not == -->
+        <module name="StringLiteralEquality"/>
+
+        <!-- Correctness: override hashCode whenever you override equals -->
+        <module name="EqualsHashCode"/>
+
+        <!-- Correctness: no stray semicolons -->
+        <module name="EmptyStatement"/>
+
+        <!-- Correctness: switch must have a default branch -->
+        <module name="MissingSwitchDefault"/>
+
+        <!-- Correctness: use L suffix, not l, for long literals -->
+        <module name="UpperEll"/>
+
+        <!-- Correctness: empty catch blocks must have a comment explaining why -->
+        <module name="EmptyCatchBlock">
+            <property name="exceptionVariableName" value="expected|ignored"/>
+        </module>
+
+        <!-- Correctness: avoid finalizers -->
+        <module name="NoFinalizer"/>
+
+        <!-- Naming: abbreviations in identifiers (API, URL, etc. allowed) -->
+        <module name="AbbreviationAsWordInName">
+            <property name="allowedAbbreviations" value="API,URL,JWT,SQL,JPA,ID,DTO,SES,SES"/>
+            <property name="ignoreFinal" value="false"/>
+        </module>
+    </module>
+</module>

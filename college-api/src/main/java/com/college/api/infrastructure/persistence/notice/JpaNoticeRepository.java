@@ -21,4 +21,7 @@ public interface JpaNoticeRepository extends JpaRepository<Notice, Integer>, Jpa
 
     @Query("SELECT n.title FROM Notice n WHERE n.deletedAt IS NULL ORDER BY n.createdAt DESC")
     List<String> findLatestActiveTitles(Pageable pageable);
+
+    @Query("SELECT n FROM Notice n WHERE n.deletedAt IS NULL AND LOWER(n.category.name) = LOWER(:categoryName) ORDER BY n.createdAt DESC")
+    List<Notice> findActiveByCategory(@Param("categoryName") String categoryName);
 }

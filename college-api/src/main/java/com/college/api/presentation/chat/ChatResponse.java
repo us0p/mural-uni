@@ -6,13 +6,13 @@ import java.util.List;
 
 public record ChatResponse(String answer, List<SourceChunk> sources) {
 
-    public record SourceChunk(Integer documentId, String fileName, int chunkIndex) {}
+    public record SourceChunk(Integer documentId, String fileName, int chunkIndex, boolean isPublic) {}
 
     public static ChatResponse from(ChatService.ChatAnswer result) {
         return new ChatResponse(
                 result.answer(),
                 result.sources().stream()
-                        .map(s -> new SourceChunk(s.documentId(), s.fileName(), s.chunkIndex()))
+                        .map(s -> new SourceChunk(s.documentId(), s.fileName(), s.chunkIndex(), s.isPublic()))
                         .toList());
     }
 }

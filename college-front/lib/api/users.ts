@@ -16,6 +16,14 @@ export async function getUsers(params: GetUsersParams = {}): Promise<UserPageRes
   return apiClient.get<UserPageResponse>(`/api/users${qs ? `?${qs}` : ''}`)
 }
 
+export async function getStudents(searchParam?: string, page = 0, size = 20): Promise<UserPageResponse> {
+  const query = new URLSearchParams()
+  if (searchParam?.trim()) query.set('search_param', searchParam.trim())
+  query.set('page', String(page))
+  query.set('size', String(size))
+  return apiClient.get<UserPageResponse>(`/api/users/students?${query.toString()}`)
+}
+
 export function createUser(data: UserRequest): Promise<UserResponse> {
   return apiClient.post<UserResponse>('/api/users', data)
 }

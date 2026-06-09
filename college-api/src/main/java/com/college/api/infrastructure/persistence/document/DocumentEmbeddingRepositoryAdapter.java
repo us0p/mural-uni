@@ -20,6 +20,7 @@ public class DocumentEmbeddingRepositoryAdapter implements DocumentEmbeddingRepo
             FROM document_embedding de
             JOIN documents d ON d.id = de.document_id
             WHERE d.knowledge_base = true
+              AND de.embedding <=> CAST(? AS vector) <= ?
             ORDER BY de.embedding <=> CAST(? AS vector)
             LIMIT ?
             """;
@@ -33,9 +34,10 @@ public class DocumentEmbeddingRepositoryAdapter implements DocumentEmbeddingRepo
     }
 
     @Override
-    public List<DocumentEmbedding> findSimilarChunks(float[] queryEmbedding, int limit) {
+    public List<DocumentEmbedding> findSimilarChunks(float[] queryEmbedding, int limit, double similarityThreshold) {
+        String vectorStr = toVectorString(queryEmbedding);
         List<Integer> ids = jdbc.queryForList(SIMILARITY_SQL, Integer.class,
-                toVectorString(queryEmbedding), limit);
+                vectorStr, similarityThreshold, vectorStr, limit);
         if (ids.isEmpty()) return List.of();
         Map<Integer, DocumentEmbedding> byId = jpa.findAllById(ids).stream()
                 .collect(Collectors.toMap(DocumentEmbedding::getId, e -> e));

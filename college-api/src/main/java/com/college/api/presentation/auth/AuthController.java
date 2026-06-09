@@ -17,10 +17,7 @@ import org.springframework.beans.factory.annotation.Value;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ProblemDetail;
 import org.springframework.security.core.Authentication;
-import org.springframework.security.core.GrantedAuthority;
 import org.springframework.web.bind.annotation.*;
-
-import java.util.List;
 
 @Tag(name = "Auth", description = "Authentication")
 @RestController
@@ -52,8 +49,7 @@ public class AuthController {
                 result.phoneNumber(),
                 result.ra(),
                 result.roleId(),
-                result.roleName(),
-                result.permissions()
+                result.roleName()
         );
     }
 
@@ -64,11 +60,8 @@ public class AuthController {
     public LoginResponse me(Authentication authentication, HttpServletResponse response) {
         UserPrincipal principal = (UserPrincipal) authentication.getPrincipal();
         User user = userService.findById(principal.userId());
-        List<String> permissions = authentication.getAuthorities().stream()
-                .map(GrantedAuthority::getAuthority)
-                .toList();
         String freshToken = authService.reissueToken(
-                principal.username(), principal.userId(), user.getRole().getName(), permissions, user.getTokenVersion());
+                principal.username(), principal.userId(), user.getRole().getName(), user.getTokenVersion());
         setTokenCookie(response, freshToken);
         return new LoginResponse(
                 user.getId(),
@@ -77,8 +70,7 @@ public class AuthController {
                 user.getPhoneNumber(),
                 user.getRa(),
                 user.getRole().getId(),
-                user.getRole().getName(),
-                permissions
+                user.getRole().getName()
         );
     }
 

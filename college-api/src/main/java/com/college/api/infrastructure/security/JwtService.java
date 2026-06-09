@@ -8,7 +8,6 @@ import io.jsonwebtoken.security.Keys;
 import javax.crypto.SecretKey;
 import java.nio.charset.StandardCharsets;
 import java.util.Date;
-import java.util.List;
 
 public class JwtService {
 
@@ -20,12 +19,11 @@ public class JwtService {
         this.expirationMs = expirationMs;
     }
 
-    public String generateToken(String username, Integer userId, String role, List<String> permissions, int tokenVersion) {
+    public String generateToken(String username, Integer userId, String role, int tokenVersion) {
         return Jwts.builder()
                 .subject(username)
                 .claim("userId", userId)
                 .claim("role", role)
-                .claim("permissions", permissions)
                 .claim("tokenVersion", tokenVersion)
                 .issuedAt(new Date())
                 .expiration(new Date(System.currentTimeMillis() + expirationMs))
@@ -42,18 +40,14 @@ public class JwtService {
         return id instanceof Integer i ? i : null;
     }
 
+    public String extractRole(String token) {
+        Object role = parseClaims(token).get("role");
+        return role instanceof String s ? s : null;
+    }
+
     public Integer extractTokenVersion(String token) {
         Object v = parseClaims(token).get("tokenVersion");
         return v instanceof Integer i ? i : null;
-    }
-
-    @SuppressWarnings("unchecked")
-    public List<String> extractPermissions(String token) {
-        Object perms = parseClaims(token).get("permissions");
-        if (perms instanceof List<?> list) {
-            return (List<String>) list;
-        }
-        return List.of();
     }
 
     public boolean isTokenValid(String token) {

@@ -4,7 +4,7 @@ import { useEffect, useState, useCallback } from 'react'
 import { useParams, useRouter, notFound } from 'next/navigation'
 import ReactMarkdown from 'react-markdown'
 import remarkGfm from 'remark-gfm'
-import { ArrowLeft, Calendar, User, Tag, Pencil, AlertCircle } from 'lucide-react'
+import { ArrowLeft, Calendar, User, Tag, Pencil, AlertCircle, CheckCircle2, CalendarCheck } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
 import { Input } from '@/components/ui/input'
@@ -31,6 +31,7 @@ import { Footer } from '@/components/layout/footer'
 import { useAuth } from '@/hooks/use-auth'
 import { getNotice, updateNotice } from '@/lib/api/notices'
 import { getNoticeCategories } from '@/lib/api/notice-categories'
+import { getPresences, markPresence, removePresence } from '@/lib/api/aluno'
 import type { NoticeResponse, NoticeCategoryResponse } from '@/lib/api/types'
 import { toast } from 'sonner'
 
@@ -40,12 +41,15 @@ export default function PostPage() {
   const params = useParams()
   const router = useRouter()
   const id = Number(params.slug)
-  const { canAccessUiItem } = useAuth()
-  const canEdit = canAccessUiItem('admin_blog_post')
+  const { isAdmin, isProfessor, isAluno } = useAuth()
+  const canEdit = isAdmin || isProfessor
 
   const [post, setPost] = useState<NoticeResponse | null>(null)
   const [loading, setLoading] = useState(true)
   const [notFoundError, setNotFoundError] = useState(false)
+
+  const [attended, setAttended] = useState(false)
+  const [presenceLoading, setPresenceLoading] = useState(false)
 
   const [isEditOpen, setIsEditOpen] = useState(false)
   const [editForm, setEditForm] = useState<EditForm>({ title: '', markdownContent: '', categoryId: '', coverImgUrl: '' })
@@ -61,6 +65,15 @@ export default function PostPage() {
   }, [id])
 
   useEffect(() => { loadPost() }, [loadPost])
+
+  useEffect(() => {
+    if (!isAluno || !post || post.categoryName?.toLowerCase() !== 'evento') return
+    getPresences()
+      .then((presences) => {
+        setAttended(presences.some((p) => p.notice.id === post.id && p.attended))
+      })
+      .catch(() => {})
+  }, [isAluno, post])
 
   const handleEditOpen = () => {
     if (!post) return
@@ -140,22 +153,72 @@ export default function PostPage() {
         )}
 
         <div className="mx-auto max-w-3xl px-4 py-12 sm:px-6 lg:px-8">
-          {/* Nav row: back button left, edit button right */}
-          <div className="mb-8 flex items-center justify-between">
+          {/* Nav row: back button left, actions right */}
+          <div className="mb-8 flex items-center justify-between gap-4">
             <Button variant="outline" onClick={() => router.back()}>
               <ArrowLeft className="mr-2 h-4 w-4" />
               Voltar
             </Button>
-            {canEdit && (
-              <Button
-                variant="outline"
-                onClick={handleEditOpen}
-                className="gap-2"
-              >
-                <Pencil className="h-4 w-4" />
-                Editar aviso
-              </Button>
-            )}
+            <div className="flex items-center gap-2">
+              {isAluno && post!.categoryName?.toLowerCase() === 'evento' && (
+                attended ? (
+                  <div className="flex items-center gap-2">
+                    <Badge variant="outline" className="border-green-500 text-green-600 gap-1">
+                      <CheckCircle2 className="h-3 w-3" />
+                      Presença Confirmada
+                    </Badge>
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      disabled={presenceLoading}
+                      onClick={async () => {
+                        setPresenceLoading(true)
+                        try {
+                          await removePresence(post!.id)
+                          setAttended(false)
+                        } catch {
+                          toast.error('Erro ao remover presença')
+                        } finally {
+                          setPresenceLoading(false)
+                        }
+                      }}
+                      className="text-muted-foreground hover:text-destructive text-xs"
+                    >
+                      Remover presença
+                    </Button>
+                  </div>
+                ) : (
+                  <Button
+                    disabled={presenceLoading}
+                    onClick={async () => {
+                      setPresenceLoading(true)
+                      try {
+                        await markPresence(post!.id)
+                        setAttended(true)
+                      } catch {
+                        toast.error('Erro ao marcar presença')
+                      } finally {
+                        setPresenceLoading(false)
+                      }
+                    }}
+                    className="gap-2"
+                  >
+                    <CalendarCheck className="h-4 w-4" />
+                    Marcar Presença
+                  </Button>
+                )
+              )}
+              {canEdit && (
+                <Button
+                  variant="outline"
+                  onClick={handleEditOpen}
+                  className="gap-2"
+                >
+                  <Pencil className="h-4 w-4" />
+                  Editar aviso
+                </Button>
+              )}
+            </div>
           </div>
 
           <article>

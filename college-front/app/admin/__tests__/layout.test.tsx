@@ -20,17 +20,18 @@ vi.mock('@/components/layout/admin-sidebar', () => ({
 
 import { useAuth } from '@/hooks/use-auth'
 
-const mockUser = { id: 1, username: 'admin', email: 'admin@test.com', roleId: 1, roleName: 'Admin' }
+const mockUser = { id: 1, username: 'admin', email: 'admin@test.com', roleId: 1, roleName: 'admin' }
 
 function makeAuth(overrides: Partial<ReturnType<typeof useAuth>>) {
   return {
     user: null,
+    role: null,
     isLoading: false,
     isAdmin: false,
+    isProfessor: false,
+    isAluno: false,
     login: vi.fn(),
     logout: vi.fn(),
-    hasPermission: vi.fn(() => false),
-    canAccessUiItem: vi.fn(() => false),
     ...overrides,
   }
 }
@@ -58,12 +59,14 @@ describe('AdminLayout', () => {
     })
   })
 
-  it('redirects to / (home) when user is authenticated but lacks admin_dashboard permission', async () => {
+  it('redirects to / when user is authenticated but is aluno', async () => {
     vi.mocked(useAuth).mockReturnValue(
       makeAuth({
         user: mockUser,
         isLoading: false,
-        canAccessUiItem: () => false,
+        isAdmin: false,
+        isProfessor: false,
+        isAluno: true,
       }),
     )
 
@@ -79,7 +82,8 @@ describe('AdminLayout', () => {
       makeAuth({
         user: mockUser,
         isLoading: false,
-        canAccessUiItem: () => false,
+        isAdmin: false,
+        isProfessor: false,
       }),
     )
 
@@ -89,12 +93,12 @@ describe('AdminLayout', () => {
     expect(mockPush).not.toHaveBeenCalledWith('/login')
   })
 
-  it('renders children when user has admin_dashboard permission', async () => {
+  it('renders children when user is admin', async () => {
     vi.mocked(useAuth).mockReturnValue(
       makeAuth({
         user: mockUser,
         isLoading: false,
-        canAccessUiItem: () => true,
+        isAdmin: true,
       }),
     )
 
@@ -102,6 +106,22 @@ describe('AdminLayout', () => {
 
     await waitFor(() => {
       expect(getByText('protected content')).toBeInTheDocument()
+    })
+  })
+
+  it('renders children when user is professor', async () => {
+    vi.mocked(useAuth).mockReturnValue(
+      makeAuth({
+        user: mockUser,
+        isLoading: false,
+        isProfessor: true,
+      }),
+    )
+
+    const { getByText } = render(<AdminLayout>professor content</AdminLayout>)
+
+    await waitFor(() => {
+      expect(getByText('professor content')).toBeInTheDocument()
     })
   })
 

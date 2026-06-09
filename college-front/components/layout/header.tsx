@@ -15,7 +15,9 @@ const navLinks = [
 
 export function Header() {
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false)
-  const { user, logout, canAccessUiItem } = useAuth()
+  const { user, logout, isAdmin, isProfessor, isAluno } = useAuth()
+
+  const canAccessAdmin = isAdmin || isProfessor
 
   return (
     <header className="sticky top-0 z-50 w-full border-b border-border bg-card/95 backdrop-blur supports-[backdrop-filter]:bg-card/80">
@@ -45,9 +47,14 @@ export function Header() {
         <div className="hidden items-center gap-3 md:flex">
           {user ? (
             <>
-              {canAccessUiItem('admin_dashboard') && (
+              {canAccessAdmin && (
                 <Button variant="outline" size="sm" asChild>
                   <Link href="/admin">Painel Admin</Link>
+                </Button>
+              )}
+              {isAluno && (
+                <Button variant="outline" size="sm" asChild>
+                  <Link href="/aluno">Minha Área</Link>
                 </Button>
               )}
               <span className="text-sm text-muted-foreground">
@@ -96,13 +103,22 @@ export function Header() {
             <div className="border-t border-border pt-3">
               {user ? (
                 <>
-                  {canAccessUiItem('admin_dashboard') && (
+                  {canAccessAdmin && (
                     <Link
                       href="/admin"
                       className="block rounded-md px-3 py-2 text-base font-medium text-accent"
                       onClick={() => setMobileMenuOpen(false)}
                     >
                       Painel Admin
+                    </Link>
+                  )}
+                  {isAluno && (
+                    <Link
+                      href="/aluno"
+                      className="block rounded-md px-3 py-2 text-base font-medium text-accent"
+                      onClick={() => setMobileMenuOpen(false)}
+                    >
+                      Minha Área
                     </Link>
                   )}
                   <button

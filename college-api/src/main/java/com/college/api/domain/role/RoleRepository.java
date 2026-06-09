@@ -7,7 +7,7 @@ public interface RoleRepository {
     Role save(Role role);
     Optional<Role> findById(Integer id);
     Optional<Role> findByName(String name);
-    RolePage findFiltered(String searchParam, int page, int size);
+    List<Role> findAll();
     void deleteById(Integer id);
     boolean existsById(Integer id);
 }

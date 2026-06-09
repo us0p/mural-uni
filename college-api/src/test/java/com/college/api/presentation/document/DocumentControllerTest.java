@@ -31,20 +31,25 @@ class DocumentControllerTest {
     @MockBean DocumentService service;
 
     private final User user = User.builder().id(1).username("alice")
-            .role(Role.builder().id(1).name("student").build()).build();
+            .role(Role.builder().id(1).name("admin").build()).build();
 
     private Document buildDocument() {
         return Document.builder()
                 .id(1).user(user).fileName("report.pdf")
                 .description("Annual report").fileSize(1024)
-                .bucketUrl("https://bucket.s3.us-east-1.amazonaws.com/uuid_report.pdf")
+                .bucketUrl("https://bucket.example.com/uuid_report.pdf")
                 .knowledgeBase(true)
+                .isPublic(false)
                 .build();
+    }
+
+    private DocumentService.DocumentWithRecipient buildDocumentWithRecipient() {
+        return new DocumentService.DocumentWithRecipient(buildDocument(), null);
     }
 
     @Test
     void GET_findAll_returns200WithList() throws Exception {
-        when(service.findAll()).thenReturn(List.of(buildDocument()));
+        when(service.findAll()).thenReturn(List.of(buildDocumentWithRecipient()));
 
         mockMvc.perform(get("/api/documents"))
                 .andExpect(status().isOk())
@@ -55,8 +60,8 @@ class DocumentControllerTest {
     @Test
     @WithUserPrincipal
     void POST_create_withValidMultipart_returns201() throws Exception {
-        when(service.create(anyInt(), any(), any(), any(), any(), anyInt(), anyBoolean()))
-                .thenReturn(buildDocument());
+        when(service.create(anyInt(), any(), any(), any(), any(), anyInt(), anyBoolean(), anyBoolean(), isNull()))
+                .thenReturn(buildDocumentWithRecipient());
 
         MockMultipartFile file = new MockMultipartFile(
                 "file", "report.pdf", "application/pdf", new byte[1024]);
@@ -74,8 +79,8 @@ class DocumentControllerTest {
     @Test
     @WithUserPrincipal
     void POST_create_withoutDescription_returns201() throws Exception {
-        when(service.create(anyInt(), any(), isNull(), any(), any(), anyInt(), anyBoolean()))
-                .thenReturn(buildDocument());
+        when(service.create(anyInt(), any(), isNull(), any(), any(), anyInt(), anyBoolean(), anyBoolean(), isNull()))
+                .thenReturn(buildDocumentWithRecipient());
 
         MockMultipartFile file = new MockMultipartFile(
                 "file", "report.pdf", "application/pdf", new byte[1024]);
@@ -92,9 +97,11 @@ class DocumentControllerTest {
     }
 
     @Test
+    @WithUserPrincipal
     void GET_download_returnsFileBytes() throws Exception {
         byte[] content = new byte[]{1, 2, 3};
-        when(service.download(1)).thenReturn(new DocumentService.DocumentDownload("report.pdf", content));
+        when(service.download(eq(1), anyInt(), any()))
+                .thenReturn(new DocumentService.DocumentDownload("report.pdf", content));
 
         mockMvc.perform(get("/api/documents/1/download"))
                 .andExpect(status().isOk())
@@ -104,8 +111,10 @@ class DocumentControllerTest {
     }
 
     @Test
+    @WithUserPrincipal
     void GET_download_whenNotFound_returns404() throws Exception {
-        when(service.download(99)).thenThrow(new ResourceNotFoundException("Document", 99));
+        when(service.download(eq(99), anyInt(), any()))
+                .thenThrow(new ResourceNotFoundException("Document", 99));
 
         mockMvc.perform(get("/api/documents/99/download"))
                 .andExpect(status().isNotFound());

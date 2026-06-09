@@ -21,18 +21,18 @@ vi.mock('next/link', () => ({
 
 import { useAuth } from '@/hooks/use-auth'
 
-const mockUser = { id: 1, username: 'admin', email: 'admin@test.com', roleId: 1, roleName: 'Admin' }
+const mockUser = { id: 1, username: 'admin', email: 'admin@test.com', roleId: 1, roleName: 'admin' }
 
 function makeAuth(overrides: Partial<ReturnType<typeof useAuth>>) {
   return {
     user: null,
-    token: null,
+    role: null,
     isLoading: false,
     isAdmin: false,
+    isProfessor: false,
+    isAluno: false,
     login: vi.fn(),
     logout: vi.fn(),
-    hasPermission: vi.fn(() => false),
-    canAccessUiItem: vi.fn(() => false),
     ...overrides,
   }
 }
@@ -54,9 +54,9 @@ describe('LoginPage', () => {
     })
   })
 
-  it('redirects even when canAccessUiItem is false — auth is enough for the redirect', async () => {
+  it('redirects regardless of role — any authenticated user is sent to /admin', async () => {
     vi.mocked(useAuth).mockReturnValue(
-      makeAuth({ user: mockUser, isLoading: false, canAccessUiItem: () => false }),
+      makeAuth({ user: mockUser, isLoading: false, isAdmin: false }),
     )
 
     render(<LoginPage />)

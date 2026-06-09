@@ -20,6 +20,7 @@ import {
 } from '@/components/ui/select'
 import { useAuth } from '@/hooks/use-auth'
 import { createNotice } from '@/lib/api/notices'
+import { getErrorMessage } from '@/lib/api/client'
 import { getNoticeCategories } from '@/lib/api/notice-categories'
 import type { NoticeCategoryResponse } from '@/lib/api/types'
 
@@ -54,8 +55,8 @@ export default function NovoAvisoPage() {
         coverImgUrl: coverImgUrl.trim() || undefined,
       })
       router.push('/admin/posts')
-    } catch {
-      setError('Erro ao publicar o aviso. Tente novamente.')
+    } catch (err) {
+      setError(getErrorMessage(err, 'Erro ao publicar o aviso. Tente novamente.'))
       setIsSaving(false)
     }
   }
@@ -178,7 +179,6 @@ export default function NovoAvisoPage() {
           {/* Cover image — scrolls with the content */}
           {coverImgUrl.trim() && (
             <div className="relative h-48 w-full overflow-hidden sm:h-56">
-              {/* eslint-disable-next-line @next/next/no-img-element */}
               <img
                 src={coverImgUrl}
                 alt="Capa"
@@ -224,7 +224,6 @@ export default function NovoAvisoPage() {
                     img({ src, alt }) {
                       if (!src) return null
                       return (
-                        // eslint-disable-next-line @next/next/no-img-element
                         <img
                           src={src}
                           alt={alt ?? ''}

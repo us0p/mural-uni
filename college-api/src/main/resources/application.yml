@@ -27,19 +27,20 @@ spring:
 server:
   port: 8080
 
-aws:
-  s3:
-    bucket-name: ${AWS_S3_BUCKET_NAME:college-documents}
-    region: ${AWS_S3_REGION:}
-  ses:
-    from-email: ${AWS_SES_FROM_EMAIL:noreply@example.com}
-    region: ${AWS_SES_REGION:}
+storage:
+  path: ${DOCUMENTS_STORAGE_PATH:/app/documents}
+
+resend:
+  api-key: ${RESEND_API_KEY:}
+  from-email: ${RESEND_FROM_EMAIL:noreply@example.com}
 
 ollama:
   enabled: ${OLLAMA_ENABLED:true}
   base-url: ${OLLAMA_BASE_URL:http://host.docker.internal:11434}
   model: ${OLLAMA_MODEL:nomic-embed-text}
-  chat-model: ${OLLAMA_CHAT_MODEL:llama3.2}
+
+chat:
+  similarity-threshold: ${CHAT_SIMILARITY_THRESHOLD:0.7}
 
 jwt:
   secret: ${JWT_SECRET}

@@ -40,11 +40,11 @@ public class JwtAuthFilter extends OncePerRequestFilter {
             Optional<User> maybeUser = userRepository.findById(userId);
             if (maybeUser.isPresent() && Objects.equals(jwtVersion, maybeUser.get().getTokenVersion())) {
                 String username = jwtService.extractUsername(token);
-                List<SimpleGrantedAuthority> authorities = jwtService.extractPermissions(token)
-                        .stream()
-                        .map(SimpleGrantedAuthority::new)
-                        .toList();
-                UserPrincipal principal = new UserPrincipal(username, userId);
+                String role = jwtService.extractRole(token);
+                List<SimpleGrantedAuthority> authorities = role != null
+                        ? List.of(new SimpleGrantedAuthority(role))
+                        : List.of();
+                UserPrincipal principal = new UserPrincipal(username, userId, role);
                 UsernamePasswordAuthenticationToken auth = new UsernamePasswordAuthenticationToken(
                         principal, null, authorities);
                 auth.setDetails(new WebAuthenticationDetailsSource().buildDetails(request));

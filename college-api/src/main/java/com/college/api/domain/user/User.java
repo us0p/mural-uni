@@ -3,6 +3,7 @@ package com.college.api.domain.user;
 import com.college.api.domain.role.Role;
 import jakarta.persistence.*;
 import lombok.*;
+import java.time.OffsetDateTime;
 
 @Entity
 @Table(name = "users")
@@ -40,4 +41,7 @@ public class User {
     @Builder.Default
     @Column(name = "token_version", nullable = false)
     private int tokenVersion = 1;
+
+    @Column(name = "first_login_at")
+    private OffsetDateTime firstLoginAt;
 }

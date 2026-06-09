@@ -9,4 +9,5 @@ public interface DocumentRepository {
     List<Document> findAll();
     void deleteById(Integer id);
     boolean existsById(Integer id);
+    List<Document> findAllByIsPublicTrue();
 }

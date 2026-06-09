@@ -60,7 +60,7 @@ public class NoticeController {
     @ApiResponse(responseCode = "404", description = "Category not found",
             content = @Content(mediaType = "application/problem+json",
                     schema = @Schema(implementation = ProblemDetail.class)))
-    @PreAuthorize("hasAuthority('admin')")
+    @PreAuthorize("hasAnyAuthority('admin', 'professor')")
     @PostMapping
     public ResponseEntity<NoticeResponse> create(@Valid @RequestBody NoticeRequest request,
                                                  @AuthenticationPrincipal UserPrincipal principal) {
@@ -78,7 +78,7 @@ public class NoticeController {
     @ApiResponse(responseCode = "404", description = "Notice or category not found",
             content = @Content(mediaType = "application/problem+json",
                     schema = @Schema(implementation = ProblemDetail.class)))
-    @PreAuthorize("hasAuthority('admin')")
+    @PreAuthorize("hasAnyAuthority('admin', 'professor')")
     @PutMapping("/{id}")
     public NoticeResponse update(@PathVariable Integer id, @Valid @RequestBody NoticeUpdateRequest request) {
         return NoticeResponse.from(service.update(
@@ -91,7 +91,7 @@ public class NoticeController {
     @ApiResponse(responseCode = "404", description = "Notice not found",
             content = @Content(mediaType = "application/problem+json",
                     schema = @Schema(implementation = ProblemDetail.class)))
-    @PreAuthorize("hasAuthority('admin')")
+    @PreAuthorize("hasAnyAuthority('admin', 'professor')")
     @DeleteMapping("/{id}")
     @ResponseStatus(HttpStatus.NO_CONTENT)
     public void delete(@PathVariable Integer id) {

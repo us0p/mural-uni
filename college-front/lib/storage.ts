@@ -1,4 +1,5 @@
 import type { Document, Subscriber } from './types'
+import type { ChatSource } from './api/types'
 
 const isClient = typeof window !== 'undefined'
 
@@ -53,17 +54,25 @@ export function addSubscriber(email: string): Subscriber {
   return subscriber
 }
 
+export interface ChatMessage {
+  content: string
+  role: 'user' | 'assistant'
+  sources?: ChatSource[]
+}
+
 // === CHAT HISTORY ===
-export function getChatHistory(): { content: string; role: 'user' | 'assistant' }[] {
+export function getChatHistory(): ChatMessage[] {
   if (!isClient) return []
   const data = localStorage.getItem(KEYS.chatHistory)
   return data ? JSON.parse(data) : []
 }
 
-export function saveChatMessage(content: string, role: 'user' | 'assistant'): void {
+export function saveChatMessage(content: string, role: 'user' | 'assistant', sources?: ChatSource[]): void {
   if (!isClient) return
   const history = getChatHistory()
-  history.push({ content, role })
+  const message: ChatMessage = { content, role }
+  if (sources && sources.length > 0) message.sources = sources
+  history.push(message)
   if (history.length > 50) history.splice(0, history.length - 50)
   localStorage.setItem(KEYS.chatHistory, JSON.stringify(history))
 }

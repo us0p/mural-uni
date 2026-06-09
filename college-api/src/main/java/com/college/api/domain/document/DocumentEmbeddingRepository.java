@@ -4,5 +4,5 @@ import java.util.List;
 
 public interface DocumentEmbeddingRepository {
     List<DocumentEmbedding> saveAll(List<DocumentEmbedding> embeddings);
-    List<DocumentEmbedding> findSimilarChunks(float[] queryEmbedding, int limit);
+    List<DocumentEmbedding> findSimilarChunks(float[] queryEmbedding, int limit, double similarityThreshold);
 }

@@ -40,7 +40,7 @@ public class NoticeCategoryController {
         return NoticeCategoryResponse.from(service.findById(id));
     }
 
-    @PreAuthorize("hasAuthority('admin')")
+    @PreAuthorize("hasAnyAuthority('admin', 'professor')")
     @Operation(summary = "Create a notice category")
     @ApiResponse(responseCode = "201", description = "Category created")
     @ApiResponse(responseCode = "400", description = "Validation error",
@@ -52,7 +52,7 @@ public class NoticeCategoryController {
                 .body(NoticeCategoryResponse.from(service.create(request.name())));
     }
 
-    @PreAuthorize("hasAuthority('admin')")
+    @PreAuthorize("hasAnyAuthority('admin', 'professor')")
     @Operation(summary = "Update a notice category's name")
     @ApiResponse(responseCode = "200", description = "Category updated")
     @ApiResponse(responseCode = "400", description = "Validation error",
@@ -66,7 +66,7 @@ public class NoticeCategoryController {
         return NoticeCategoryResponse.from(service.update(id, request.name()));
     }
 
-    @PreAuthorize("hasAuthority('admin')")
+    @PreAuthorize("hasAnyAuthority('admin', 'professor')")
     @Operation(summary = "Delete a notice category")
     @ApiResponse(responseCode = "204", description = "Category deleted")
     @ApiResponse(responseCode = "404", description = "Category not found",

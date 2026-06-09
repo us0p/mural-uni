@@ -1,7 +1,6 @@
 package com.college.api.presentation.document;
 
 import com.college.api.application.document.DocumentService;
-import com.college.api.domain.document.Document;
 import com.college.api.infrastructure.security.UserPrincipal;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.headers.Header;
@@ -44,27 +43,57 @@ public class DocumentController {
 
     private final DocumentService service;
 
-    @Operation(summary = "List all documents")
-    @PreAuthorize("hasAuthority('admin')")
+    @Operation(summary = "List all documents (super users only)")
+    @PreAuthorize("hasAnyAuthority('admin', 'professor')")
     @GetMapping
     public List<DocumentResponse> findAll() {
         return service.findAll().stream().map(DocumentResponse::from).toList();
     }
 
+    @Operation(summary = "List documents visible to the authenticated user",
+            description = "Super users see all documents; alunos see only documents assigned to them.")
+    @GetMapping("/mine")
+    public List<DocumentResponse> findMine(@AuthenticationPrincipal UserPrincipal principal) {
+        return service.findForCurrentUser(principal.userId(), principal.roleName())
+                .stream().map(DocumentResponse::from).toList();
+    }
+
+    @Operation(summary = "List public documents (no authentication required)")
+    @GetMapping("/public")
+    public List<DocumentResponse> findAllPublic() {
+        return service.findAllPublic().stream().map(DocumentResponse::from).toList();
+    }
+
+    @Operation(summary = "Download a public document (no authentication required)")
+    @GetMapping("/public/{id}/download")
+    public ResponseEntity<byte[]> downloadPublic(@PathVariable Integer id) {
+        DocumentService.DocumentDownload download = service.downloadPublic(id);
+        String safeFilename = download.fileName().replaceAll("[\"\\\\/:*?<>|\\r\\n]", "_");
+        return ResponseEntity.ok()
+                .header(HttpHeaders.CONTENT_DISPOSITION,
+                        org.springframework.http.ContentDisposition.attachment()
+                                .filename(safeFilename, java.nio.charset.StandardCharsets.UTF_8)
+                                .build().toString())
+                .contentType(MediaType.APPLICATION_OCTET_STREAM)
+                .body(download.content());
+    }
+
     @Operation(summary = "Upload a document",
-            description = "Uploads the file to S3, persists metadata, and automatically generates and stores vector embeddings via the configured embedding model.")
-    @ApiResponse(responseCode = "201", description = "Document uploaded and embeddings stored")
+            description = "Uploads the file to local storage and persists metadata. If recipientId is provided, the document is assigned to that aluno and the knowledge base flag is forced to false.")
+    @ApiResponse(responseCode = "201", description = "Document uploaded")
     @ApiResponse(responseCode = "400", description = "Missing required parameter or file",
             content = @Content(mediaType = "application/problem+json",
                     schema = @Schema(implementation = ProblemDetail.class)))
     @ApiResponse(responseCode = "404", description = "User not found",
             content = @Content(mediaType = "application/problem+json",
                     schema = @Schema(implementation = ProblemDetail.class)))
-    @PreAuthorize("hasAuthority('admin')")
+    @PreAuthorize("hasAnyAuthority('admin', 'professor')")
     @PostMapping(consumes = MediaType.MULTIPART_FORM_DATA_VALUE)
     public ResponseEntity<DocumentResponse> create(
             @RequestParam(required = false) String description,
             @RequestParam(required = false, defaultValue = "false") boolean knowledgeBase,
+            @RequestParam(required = false, defaultValue = "false") boolean isPublic,
+            @RequestParam(required = false) Integer recipientId,
             @RequestPart("file") MultipartFile file,
             @AuthenticationPrincipal UserPrincipal principal) throws IOException {
         if (file.isEmpty()) {
@@ -78,13 +107,13 @@ public class DocumentController {
         if (!ALLOWED_CONTENT_TYPES.contains(detectedType)) {
             throw new IllegalArgumentException("File type not allowed: " + detectedType);
         }
-        Document document = service.create(
+        DocumentService.DocumentWithRecipient result = service.create(
                 principal.userId(), safeFileName, description, bytes,
-                detectedType, bytes.length, knowledgeBase);
-        return ResponseEntity.status(HttpStatus.CREATED).body(DocumentResponse.from(document));
+                detectedType, bytes.length, knowledgeBase, isPublic, recipientId);
+        return ResponseEntity.status(HttpStatus.CREATED).body(DocumentResponse.from(result));
     }
 
-    @Operation(summary = "Download a document from S3")
+    @Operation(summary = "Download a document")
     @ApiResponse(responseCode = "200", description = "File contents",
             headers = @Header(name = HttpHeaders.CONTENT_DISPOSITION,
                     description = "attachment; filename=\"<filename>\"",
@@ -94,10 +123,10 @@ public class DocumentController {
     @ApiResponse(responseCode = "404", description = "Document not found",
             content = @Content(mediaType = "application/problem+json",
                     schema = @Schema(implementation = ProblemDetail.class)))
-    @PreAuthorize("hasAuthority('admin')")
     @GetMapping("/{id}/download")
-    public ResponseEntity<byte[]> download(@PathVariable Integer id) {
-        DocumentService.DocumentDownload download = service.download(id);
+    public ResponseEntity<byte[]> download(@PathVariable Integer id,
+                                           @AuthenticationPrincipal UserPrincipal principal) {
+        DocumentService.DocumentDownload download = service.download(id, principal.userId(), principal.roleName());
         String safeFilename = download.fileName().replaceAll("[\"\\\\/:*?<>|\\r\\n]", "_");
         return ResponseEntity.ok()
                 .header(HttpHeaders.CONTENT_DISPOSITION,
@@ -113,7 +142,7 @@ public class DocumentController {
     @ApiResponse(responseCode = "404", description = "Document not found",
             content = @Content(mediaType = "application/problem+json",
                     schema = @Schema(implementation = ProblemDetail.class)))
-    @PreAuthorize("hasAuthority('admin')")
+    @PreAuthorize("hasAnyAuthority('admin', 'professor')")
     @DeleteMapping("/{id}")
     @ResponseStatus(HttpStatus.NO_CONTENT)
     public void delete(@PathVariable Integer id) {

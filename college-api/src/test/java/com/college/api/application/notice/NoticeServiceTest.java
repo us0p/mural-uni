@@ -1,11 +1,13 @@
 package com.college.api.application.notice;
 
 import com.college.api.application.exception.ResourceNotFoundException;
+import com.college.api.domain.email.EmailPort;
 import com.college.api.domain.notice.Notice;
 import com.college.api.domain.notice.NoticeCategory;
 import com.college.api.domain.notice.NoticeCategoryRepository;
 import com.college.api.domain.notice.NoticePage;
 import com.college.api.domain.notice.NoticeRepository;
+import com.college.api.domain.notice.NoticeSubscriptionRepository;
 import com.college.api.domain.role.Role;
 import com.college.api.domain.user.User;
 import com.college.api.domain.user.UserRepository;
@@ -15,12 +17,16 @@ import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 
+import org.springframework.test.util.ReflectionTestUtils;
+
 import java.time.OffsetDateTime;
 import java.util.List;
 import java.util.Optional;
 
 import static org.assertj.core.api.Assertions.*;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.anyString;
+import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.*;
 
 @ExtendWith(MockitoExtension.class)
@@ -29,6 +35,8 @@ class NoticeServiceTest {
     @Mock private NoticeRepository noticeRepository;
     @Mock private UserRepository userRepository;
     @Mock private NoticeCategoryRepository noticeCategoryRepository;
+    @Mock private NoticeSubscriptionRepository noticeSubscriptionRepository;
+    @Mock private EmailPort emailPort;
 
     @InjectMocks
     private NoticeService service;
@@ -183,5 +191,44 @@ class NoticeServiceTest {
         service.hardDelete(1);
 
         verify(noticeRepository).deleteById(1);
+    }
+
+    // ── notice notifications ──────────────────────────────────────────────────
+
+    @Test
+    void create_withSubscribers_sendsEmailToEachSubscriber() {
+        ReflectionTestUtils.setField(service, "frontendUrl", "http://localhost:3000");
+        when(userRepository.findById(1)).thenReturn(Optional.of(user));
+        when(noticeCategoryRepository.findById(1)).thenReturn(Optional.of(category));
+        Notice saved = buildNotice();
+        when(noticeRepository.save(any())).thenReturn(saved);
+        var subscribers = List.of(
+                new NoticeSubscriptionRepository.SubscriberInfo("a@uni.br", "alice"),
+                new NoticeSubscriptionRepository.SubscriberInfo("b@uni.br", "bob")
+        );
+        when(noticeSubscriptionRepository.findSubscribersByCategoryId(1)).thenReturn(subscribers);
+
+        service.create(1, "Hello", "# Hello", 1, null);
+
+        verify(emailPort).sendNoticeNotificationEmail(eq("a@uni.br"), eq("alice"), eq("Hello"), anyString(), anyString(), anyString());
+        verify(emailPort).sendNoticeNotificationEmail(eq("b@uni.br"), eq("bob"), eq("Hello"), anyString(), anyString(), anyString());
+    }
+
+    @Test
+    void create_whenEmailThrows_noticeIsStillSaved() {
+        ReflectionTestUtils.setField(service, "frontendUrl", "http://localhost:3000");
+        when(userRepository.findById(1)).thenReturn(Optional.of(user));
+        when(noticeCategoryRepository.findById(1)).thenReturn(Optional.of(category));
+        Notice saved = buildNotice();
+        when(noticeRepository.save(any())).thenReturn(saved);
+        var subscribers = List.of(new NoticeSubscriptionRepository.SubscriberInfo("a@uni.br", "alice"));
+        when(noticeSubscriptionRepository.findSubscribersByCategoryId(1)).thenReturn(subscribers);
+        doThrow(new RuntimeException("email down")).when(emailPort)
+                .sendNoticeNotificationEmail(anyString(), anyString(), anyString(), anyString(), anyString(), anyString());
+
+        Notice result = service.create(1, "Hello", "# Hello", 1, null);
+
+        assertThat(result).isEqualTo(saved);
+        verify(noticeRepository).save(any());
     }
 }

@@ -4,8 +4,6 @@ import { useEffect, useState } from 'react'
 import {
   FileText,
   Download,
-  Lock,
-  Unlock,
   FileSpreadsheet,
   FileImage,
   File,
@@ -24,15 +22,14 @@ import {
 } from '@/components/ui/table'
 import { Header } from '@/components/layout/header'
 import { Footer } from '@/components/layout/footer'
-import { useAuth } from '@/hooks/use-auth'
-import { getDocumentsByAccessLevel, initializeStorage } from '@/lib/storage'
-import type { Document } from '@/lib/types'
+import { getPublicDocuments } from '@/lib/api/documents'
+import type { DocumentResponse } from '@/lib/api/types'
 
-function getFileIcon(fileType: string) {
-  if (fileType.includes('pdf')) return FileText
-  if (fileType.includes('spreadsheet') || fileType.includes('excel'))
-    return FileSpreadsheet
-  if (fileType.includes('image')) return FileImage
+function getFileIcon(fileName: string) {
+  const ext = fileName.split('.').pop()?.toLowerCase() ?? ''
+  if (ext === 'pdf') return FileText
+  if (ext === 'xls' || ext === 'xlsx') return FileSpreadsheet
+  if (ext === 'png' || ext === 'jpg' || ext === 'jpeg') return FileImage
   return File
 }
 
@@ -45,36 +42,29 @@ function formatFileSize(bytes: number): string {
 }
 
 export default function DocumentosPage() {
-  const { isAdmin, user } = useAuth()
-  const [documents, setDocuments] = useState<Document[]>([])
+  const [documents, setDocuments] = useState<DocumentResponse[]>([])
   const [searchQuery, setSearchQuery] = useState('')
   const [loading, setLoading] = useState(true)
 
   useEffect(() => {
-    initializeStorage()
-    const level = user ? (isAdmin ? 99 : 2) : 1
-    const docs = getDocumentsByAccessLevel(level)
-    setDocuments(docs)
-    setLoading(false)
-  }, [isAdmin, user])
+    setLoading(true)
+    getPublicDocuments()
+      .then(setDocuments)
+      .catch(() => setDocuments([]))
+      .finally(() => setLoading(false))
+  }, [])
 
   const filteredDocuments = documents.filter((doc) =>
-    doc.name.toLowerCase().includes(searchQuery.toLowerCase())
+    doc.fileName.toLowerCase().includes(searchQuery.toLowerCase())
   )
 
-  const handleDownload = (doc: Document) => {
-    // Simula download - em produção seria um link real
-    const blob = new Blob(['Conteúdo simulado do documento: ' + doc.name], {
-      type: 'text/plain',
-    })
-    const url = URL.createObjectURL(blob)
+  const handleDownload = (doc: DocumentResponse) => {
     const a = document.createElement('a')
-    a.href = url
+    a.href = `/api/documents/public/${doc.id}/download`
     a.download = doc.fileName
     document.body.appendChild(a)
     a.click()
     document.body.removeChild(a)
-    URL.revokeObjectURL(url)
   }
 
   return (
@@ -92,13 +82,6 @@ export default function DocumentosPage() {
               Acesse manuais, calendários e documentos importantes da
               universidade.
             </p>
-            {!user && (
-              <p className="mt-4 text-sm text-muted-foreground">
-                <Lock className="mr-1 inline h-4 w-4" />
-                Faça login para acessar documentos adicionais de acordo com seu
-                nível de acesso.
-              </p>
-            )}
           </div>
         </section>
 
@@ -143,14 +126,12 @@ export default function DocumentosPage() {
                       <TableHead>Nome</TableHead>
                       <TableHead className="hidden sm:table-cell">Tipo</TableHead>
                       <TableHead className="hidden sm:table-cell">Tamanho</TableHead>
-                      <TableHead className="hidden md:table-cell">Acesso</TableHead>
-                      <TableHead className="hidden md:table-cell">Data</TableHead>
                       <TableHead className="text-right">Ação</TableHead>
                     </TableRow>
                   </TableHeader>
                   <TableBody>
                     {filteredDocuments.map((doc) => {
-                      const FileIcon = getFileIcon(doc.fileType)
+                      const FileIcon = getFileIcon(doc.fileName)
                       return (
                         <TableRow key={doc.id}>
                           <TableCell>
@@ -160,11 +141,13 @@ export default function DocumentosPage() {
                               </div>
                               <div className="min-w-0">
                                 <p className="truncate font-medium text-foreground">
-                                  {doc.name}
-                                </p>
-                                <p className="truncate text-xs text-muted-foreground">
                                   {doc.fileName}
                                 </p>
+                                {doc.description && (
+                                  <p className="truncate text-xs text-muted-foreground">
+                                    {doc.description}
+                                  </p>
+                                )}
                               </div>
                             </div>
                           </TableCell>
@@ -175,28 +158,6 @@ export default function DocumentosPage() {
                           </TableCell>
                           <TableCell className="hidden sm:table-cell text-muted-foreground">
                             {formatFileSize(doc.fileSize)}
-                          </TableCell>
-                          <TableCell className="hidden md:table-cell">
-                            {doc.isPublic ? (
-                              <Badge
-                                variant="outline"
-                                className="border-green-500 text-green-600"
-                              >
-                                <Unlock className="mr-1 h-3 w-3" />
-                                Público
-                              </Badge>
-                            ) : (
-                              <Badge
-                                variant="outline"
-                                className="border-orange-500 text-orange-600"
-                              >
-                                <Lock className="mr-1 h-3 w-3" />
-                                Restrito
-                              </Badge>
-                            )}
-                          </TableCell>
-                          <TableCell className="hidden md:table-cell text-muted-foreground">
-                            {new Date(doc.createdAt).toLocaleDateString('pt-BR')}
                           </TableCell>
                           <TableCell className="text-right">
                             <Button

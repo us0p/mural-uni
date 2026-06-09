@@ -43,8 +43,8 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from '@/components/ui/alert-dialog'
-import { useAuth } from '@/hooks/use-auth'
 import { getNotices, updateNotice, deleteNotice } from '@/lib/api/notices'
+import { getErrorMessage } from '@/lib/api/client'
 import { getNoticeCategories } from '@/lib/api/notice-categories'
 import type { NoticeResponse, NoticeCategoryResponse } from '@/lib/api/types'
 import { DEBOUNCE_MS, PAGE_SIZE } from '@/lib/constants'
@@ -86,8 +86,8 @@ export default function AdminPostsPage() {
       setPosts(data.content)
       setTotalPages(data.totalPages)
       setTotalElements(data.totalElements)
-    } catch {
-      setError('Não foi possível carregar os avisos.')
+    } catch (err) {
+      setError(getErrorMessage(err, 'Não foi possível carregar os avisos.'))
     } finally {
       setIsLoading(false)
     }
@@ -98,7 +98,7 @@ export default function AdminPostsPage() {
     loadPosts('', 0)
     getNoticeCategories()
       .then(setCategories)
-      .catch(() => setError('Não foi possível carregar as categorias.'))
+      .catch((err) => setError(getErrorMessage(err, 'Não foi possível carregar as categorias.')))
   }, [loadPosts])
 
   // Debounced search — resets to page 0
@@ -139,8 +139,8 @@ export default function AdminPostsPage() {
       await updateNotice(selectedPost.id, { title: formData.title, markdownContent: formData.markdownContent, categoryId, coverImgUrl })
       await loadPosts(searchQuery, currentPage)
       setIsDialogOpen(false)
-    } catch {
-      setFormError('Erro ao salvar o aviso. Tente novamente.')
+    } catch (err) {
+      setFormError(getErrorMessage(err, 'Erro ao salvar o aviso. Tente novamente.'))
     } finally {
       setIsSaving(false)
     }
@@ -153,8 +153,8 @@ export default function AdminPostsPage() {
       const newPage = posts.length === 1 && currentPage > 0 ? currentPage - 1 : currentPage
       setCurrentPage(newPage)
       await loadPosts(searchQuery, newPage)
-    } catch {
-      setError('Erro ao excluir o aviso.')
+    } catch (err) {
+      setError(getErrorMessage(err, 'Erro ao excluir o aviso.'))
     } finally {
       setIsDeleteDialogOpen(false)
       setSelectedPost(null)

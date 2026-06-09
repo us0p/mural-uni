@@ -36,20 +36,28 @@ public class AdminUserBootstrap {
     @EventListener(ApplicationReadyEvent.class)
     public void seed() {
         try {
-            if (userRepository.findByUsername(adminUsername).isPresent()) {
-                return;
-            }
-            Role adminRole = roleRepository.findByName("admin")
-                    .orElseThrow(() -> new IllegalStateException("Admin role not found — ensure migrations have run."));
-            userRepository.save(User.builder()
-                    .username(adminUsername)
-                    .passwordHash(passwordEncoder.encode(adminPassword))
-                    .email(adminEmail)
-                    .role(adminRole)
-                    .build());
-            log.info("Admin user '{}' created.", adminUsername);
+            userRepository.findByUsername(adminUsername).ifPresentOrElse(
+                user -> {
+                    if (!passwordEncoder.matches(adminPassword, user.getPasswordHash())) {
+                        user.setPasswordHash(passwordEncoder.encode(adminPassword));
+                        userRepository.save(user);
+                        log.info("Admin user '{}' password synced from env.", adminUsername);
+                    }
+                },
+                () -> {
+                    Role adminRole = roleRepository.findByName("admin")
+                            .orElseThrow(() -> new IllegalStateException("Admin role not found — ensure migrations have run."));
+                    userRepository.save(User.builder()
+                            .username(adminUsername)
+                            .passwordHash(passwordEncoder.encode(adminPassword))
+                            .email(adminEmail)
+                            .role(adminRole)
+                            .build());
+                    log.info("Admin user '{}' created.", adminUsername);
+                }
+            );
         } catch (Exception e) {
-            log.error("Admin bootstrap skipped: {}", e.getMessage());
+            log.error("Admin bootstrap failed: {}", e.getMessage());
         }
     }
 }

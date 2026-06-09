@@ -43,8 +43,8 @@ import {
 import type { NoticeCategoryResponse } from '@/lib/api/types'
 
 export default function AdminCategoriasPage() {
-  const { canAccessUiItem } = useAuth()
-  const canAccess = canAccessUiItem('admin_notice_categories')
+  const { isAdmin, isProfessor } = useAuth()
+  const canAccess = isAdmin || isProfessor
 
   const [categories, setCategories] = useState<NoticeCategoryResponse[]>([])
   const [isLoading, setIsLoading] = useState(true)

@@ -4,19 +4,23 @@ import com.college.api.domain.user.UserRepository;
 import com.college.api.infrastructure.security.JwtAuthFilter;
 import com.college.api.infrastructure.security.JwtService;
 import com.college.api.infrastructure.security.RateLimitFilter;
+import com.college.api.infrastructure.security.RouteAccessRule;
+import com.college.api.infrastructure.security.RouteAccessRuleLoader;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.http.HttpMethod;
 import org.springframework.security.config.Customizer;
-import org.springframework.security.config.annotation.web.builders.HttpSecurity;
 import org.springframework.security.config.annotation.method.configuration.EnableMethodSecurity;
+import org.springframework.security.config.annotation.web.builders.HttpSecurity;
 import org.springframework.security.config.annotation.web.configuration.EnableWebSecurity;
 import org.springframework.security.config.annotation.web.configurers.AbstractHttpConfigurer;
 import org.springframework.security.config.http.SessionCreationPolicy;
 import org.springframework.security.web.SecurityFilterChain;
 import org.springframework.security.web.authentication.UsernamePasswordAuthenticationFilter;
 import org.springframework.security.web.header.writers.ReferrerPolicyHeaderWriter;
+import org.springframework.security.web.util.matcher.AntPathRequestMatcher;
+import org.springframework.security.web.util.matcher.RequestMatcher;
 import org.springframework.web.cors.CorsConfiguration;
 import org.springframework.web.cors.CorsConfigurationSource;
 import org.springframework.web.cors.UrlBasedCorsConfigurationSource;
@@ -69,7 +73,10 @@ public class SecurityConfig {
     @Bean
     public SecurityFilterChain filterChain(HttpSecurity http,
                                            JwtAuthFilter jwtAuthFilter,
-                                           RateLimitFilter rateLimitFilter) throws Exception {
+                                           RateLimitFilter rateLimitFilter,
+                                           RouteAccessRuleLoader ruleLoader) throws Exception {
+        List<RouteAccessRule> rules = ruleLoader.loadRules();
+
         return http
                 .cors(cors -> cors.configurationSource(corsConfigurationSource()))
                 .csrf(AbstractHttpConfigurer::disable)
@@ -82,17 +89,22 @@ public class SecurityConfig {
                                 .includeSubDomains(true)
                                 .maxAgeInSeconds(31_536_000))
                 )
-                .authorizeHttpRequests(auth -> auth
-                        .requestMatchers(HttpMethod.OPTIONS, "/**").permitAll()
-                        .requestMatchers(HttpMethod.POST, "/api/auth/login", "/api/auth/logout",
-                                "/api/auth/set-password", "/api/auth/forgot-password").permitAll()
-                        .requestMatchers(HttpMethod.GET, "/api/notices", "/api/notices/**").permitAll()
-                        .requestMatchers(HttpMethod.GET, "/api/notice-categories", "/api/notice-categories/**").permitAll()
-                        .requestMatchers(HttpMethod.GET, "/api/stats").permitAll()
-                        .requestMatchers("/swagger-ui/**", "/swagger-ui.html", "/api-docs/**", "/v3/api-docs/**")
-                                .hasAuthority("admin")
-                        .anyRequest().authenticated()
-                )
+                .authorizeHttpRequests(auth -> {
+                    for (RouteAccessRule rule : rules) {
+                        RequestMatcher matcher = rule.httpMethod() != null
+                                ? new AntPathRequestMatcher(rule.pathPattern(), rule.httpMethod())
+                                : new AntPathRequestMatcher(rule.pathPattern());
+                        String[] roles = rule.allowedRoles().split(",");
+                        if ("PUBLIC".equals(roles[0])) {
+                            auth.requestMatchers(matcher).permitAll();
+                        } else if ("AUTHENTICATED".equals(roles[0])) {
+                            auth.requestMatchers(matcher).authenticated();
+                        } else {
+                            auth.requestMatchers(matcher).hasAnyAuthority(roles);
+                        }
+                    }
+                    auth.anyRequest().denyAll();
+                })
                 .addFilterBefore(rateLimitFilter, UsernamePasswordAuthenticationFilter.class)
                 .addFilterBefore(jwtAuthFilter, UsernamePasswordAuthenticationFilter.class)
                 .build();

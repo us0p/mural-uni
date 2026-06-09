@@ -15,7 +15,8 @@ public class WithUserPrincipalSecurityContextFactory
     @Override
     public SecurityContext createSecurityContext(WithUserPrincipal annotation) {
         SecurityContext context = SecurityContextHolder.createEmptyContext();
-        var principal = new UserPrincipal(annotation.username(), annotation.userId());
+        String roleName = annotation.authorities().length > 0 ? annotation.authorities()[0] : null;
+        var principal = new UserPrincipal(annotation.username(), annotation.userId(), roleName);
         var authorities = Arrays.stream(annotation.authorities())
                 .map(SimpleGrantedAuthority::new)
                 .toList();

@@ -23,7 +23,7 @@ import { DEBOUNCE_MS, PAGE_SIZE } from '@/lib/constants'
 const emptyForm = { username: '', email: '', phoneNumber: '', roleId: '' as string | number, ra: '' }
 
 export default function AdminUsuariosPage() {
-  const { user: currentUser } = useAuth()
+  const { user: currentUser, isAdmin } = useAuth()
 
   const [users, setUsers] = useState<UserResponse[]>([])
   const [roles, setRoles] = useState<RoleResponse[]>([])
@@ -60,8 +60,8 @@ export default function AdminUsuariosPage() {
 
   useEffect(() => {
     load('', 0)
-    getRoles({ size: 100 })
-      .then((data) => setRoles(data.content ?? []))
+    getRoles()
+      .then((data) => setRoles(data))
       .catch(() => {})
   }, [load])
 
@@ -130,9 +130,11 @@ export default function AdminUsuariosPage() {
           <h1 className="text-2xl font-bold tracking-tight text-foreground">Usuários</h1>
           <p className="text-muted-foreground">Gerencie os usuários e suas permissões</p>
         </div>
-        <Button onClick={() => handleOpenDialog()} className="bg-accent text-accent-foreground hover:bg-accent/90">
-          <Plus className="mr-2 h-4 w-4" />Novo Usuário
-        </Button>
+        {isAdmin && (
+          <Button onClick={() => handleOpenDialog()} className="bg-accent text-accent-foreground hover:bg-accent/90">
+            <Plus className="mr-2 h-4 w-4" />Novo Usuário
+          </Button>
+        )}
       </div>
 
       {error && (
@@ -156,15 +158,15 @@ export default function AdminUsuariosPage() {
               <TableHead className="hidden sm:table-cell">Contato</TableHead>
               <TableHead className="hidden sm:table-cell">Papel</TableHead>
               <TableHead className="hidden md:table-cell">RA</TableHead>
-              <TableHead className="text-right">Ações</TableHead>
+              {isAdmin && <TableHead className="text-right">Ações</TableHead>}
             </TableRow>
           </TableHeader>
           <TableBody>
             {isLoading ? (
-              <TableRow><TableCell colSpan={5} className="py-8 text-center text-muted-foreground">Carregando...</TableCell></TableRow>
+              <TableRow><TableCell colSpan={isAdmin ? 5 : 4} className="py-8 text-center text-muted-foreground">Carregando...</TableCell></TableRow>
             ) : users.length === 0 ? (
               <TableRow>
-                <TableCell colSpan={5} className="py-8 text-center">
+                <TableCell colSpan={isAdmin ? 5 : 4} className="py-8 text-center">
                   <Users className="mx-auto h-12 w-12 text-muted-foreground/50" />
                   <p className="mt-2 text-muted-foreground">Nenhum usuário encontrado.</p>
                 </TableCell>
@@ -192,15 +194,17 @@ export default function AdminUsuariosPage() {
                   <Badge variant="outline"><Shield className="mr-1 h-3 w-3" />{user.roleName}</Badge>
                 </TableCell>
                 <TableCell className="hidden md:table-cell text-muted-foreground">{user.ra ?? '—'}</TableCell>
-                <TableCell className="text-right">
-                  <div className="flex justify-end gap-2">
-                    <Button variant="ghost" size="icon" onClick={() => handleOpenDialog(user)}><Pencil className="h-4 w-4" /></Button>
-                    <Button variant="ghost" size="icon" onClick={() => { setSelected(user); setIsDeleteDialogOpen(true) }}
-                      disabled={user.id === currentUser?.id}>
-                      <Trash2 className="h-4 w-4 text-destructive" />
-                    </Button>
-                  </div>
-                </TableCell>
+                {isAdmin && (
+                  <TableCell className="text-right">
+                    <div className="flex justify-end gap-2">
+                      <Button variant="ghost" size="icon" onClick={() => handleOpenDialog(user)}><Pencil className="h-4 w-4" /></Button>
+                      <Button variant="ghost" size="icon" onClick={() => { setSelected(user); setIsDeleteDialogOpen(true) }}
+                        disabled={user.id === currentUser?.id}>
+                        <Trash2 className="h-4 w-4 text-destructive" />
+                      </Button>
+                    </div>
+                  </TableCell>
+                )}
               </TableRow>
             ))}
           </TableBody>
@@ -221,61 +225,65 @@ export default function AdminUsuariosPage() {
         </div>
       )}
 
-      <Dialog open={isDialogOpen} onOpenChange={setIsDialogOpen}>
-        <DialogContent className="sm:max-w-md">
-          <DialogHeader>
-            <DialogTitle>{selected ? 'Editar Usuário' : 'Novo Usuário'}</DialogTitle>
-            <DialogDescription>
-              {selected ? 'Atualize as informações do usuário.' : 'Preencha as informações do novo usuário. Um e-mail será enviado para o usuário criar sua senha.'}
-            </DialogDescription>
-          </DialogHeader>
-          <form onSubmit={handleSubmit} className="space-y-4">
-            {formError && <Alert variant="destructive"><AlertCircle className="h-4 w-4" /><AlertDescription>{formError}</AlertDescription></Alert>}
-            <div className="space-y-2">
-              <Label htmlFor="username">Nome de Usuário</Label>
-              <Input id="username" value={formData.username} onChange={(e) => setFormData({ ...formData, username: e.target.value })} placeholder="Ex: joao.silva" maxLength={20} required />
-            </div>
-            <div className="space-y-2">
-              <Label htmlFor="email">E-mail</Label>
-              <Input id="email" type="email" value={formData.email} onChange={(e) => setFormData({ ...formData, email: e.target.value })} placeholder="Ex: joao@universidade.com" maxLength={254} required />
-            </div>
-            <div className="space-y-2">
-              <Label htmlFor="phone">Telefone (opcional)</Label>
-              <Input id="phone" value={formData.phoneNumber} onChange={(e) => setFormData({ ...formData, phoneNumber: e.target.value })} placeholder="Ex: (11) 99999-9999" maxLength={20} />
-            </div>
-            <div className="space-y-2">
-              <Label htmlFor="ra">RA (opcional)</Label>
-              <Input id="ra" value={formData.ra} onChange={(e) => setFormData({ ...formData, ra: e.target.value })} placeholder="Ex: RA123456" maxLength={10} />
-            </div>
-            <div className="space-y-2">
-              <Label htmlFor="roleId">Papel *</Label>
-              <Select value={String(formData.roleId)} onValueChange={(v) => setFormData({ ...formData, roleId: Number(v) })} required>
-                <SelectTrigger id="roleId"><SelectValue placeholder="Selecione um papel" /></SelectTrigger>
-                <SelectContent>{roles.map((role) => <SelectItem key={role.id} value={String(role.id)}>{role.name}</SelectItem>)}</SelectContent>
-              </Select>
-            </div>
-            <DialogFooter>
-              <Button type="button" variant="outline" onClick={() => setIsDialogOpen(false)}>Cancelar</Button>
-              <Button type="submit" disabled={isSaving || !formData.username.trim() || !formData.email.trim() || !formData.roleId} className="bg-accent text-accent-foreground hover:bg-accent/90">
-                {isSaving ? 'Salvando...' : selected ? 'Salvar' : 'Criar'}
-              </Button>
-            </DialogFooter>
-          </form>
-        </DialogContent>
-      </Dialog>
+      {isAdmin && (
+        <>
+          <Dialog open={isDialogOpen} onOpenChange={setIsDialogOpen}>
+            <DialogContent className="sm:max-w-md">
+              <DialogHeader>
+                <DialogTitle>{selected ? 'Editar Usuário' : 'Novo Usuário'}</DialogTitle>
+                <DialogDescription>
+                  {selected ? 'Atualize as informações do usuário.' : 'Preencha as informações do novo usuário. Um e-mail será enviado para o usuário criar sua senha.'}
+                </DialogDescription>
+              </DialogHeader>
+              <form onSubmit={handleSubmit} className="space-y-4">
+                {formError && <Alert variant="destructive"><AlertCircle className="h-4 w-4" /><AlertDescription>{formError}</AlertDescription></Alert>}
+                <div className="space-y-2">
+                  <Label htmlFor="username">Nome de Usuário</Label>
+                  <Input id="username" value={formData.username} onChange={(e) => setFormData({ ...formData, username: e.target.value })} placeholder="Ex: joao.silva" maxLength={20} required />
+                </div>
+                <div className="space-y-2">
+                  <Label htmlFor="email">E-mail</Label>
+                  <Input id="email" type="email" value={formData.email} onChange={(e) => setFormData({ ...formData, email: e.target.value })} placeholder="Ex: joao@universidade.com" maxLength={254} required />
+                </div>
+                <div className="space-y-2">
+                  <Label htmlFor="phone">Telefone (opcional)</Label>
+                  <Input id="phone" value={formData.phoneNumber} onChange={(e) => setFormData({ ...formData, phoneNumber: e.target.value })} placeholder="Ex: (11) 99999-9999" maxLength={20} />
+                </div>
+                <div className="space-y-2">
+                  <Label htmlFor="ra">RA (opcional)</Label>
+                  <Input id="ra" value={formData.ra} onChange={(e) => setFormData({ ...formData, ra: e.target.value })} placeholder="Ex: RA123456" maxLength={10} />
+                </div>
+                <div className="space-y-2">
+                  <Label htmlFor="roleId">Papel *</Label>
+                  <Select value={String(formData.roleId)} onValueChange={(v) => setFormData({ ...formData, roleId: Number(v) })} required>
+                    <SelectTrigger id="roleId"><SelectValue placeholder="Selecione um papel" /></SelectTrigger>
+                    <SelectContent>{roles.map((role) => <SelectItem key={role.id} value={String(role.id)}>{role.name}</SelectItem>)}</SelectContent>
+                  </Select>
+                </div>
+                <DialogFooter>
+                  <Button type="button" variant="outline" onClick={() => setIsDialogOpen(false)}>Cancelar</Button>
+                  <Button type="submit" disabled={isSaving || !formData.username.trim() || !formData.email.trim() || !formData.roleId} className="bg-accent text-accent-foreground hover:bg-accent/90">
+                    {isSaving ? 'Salvando...' : selected ? 'Salvar' : 'Criar'}
+                  </Button>
+                </DialogFooter>
+              </form>
+            </DialogContent>
+          </Dialog>
 
-      <AlertDialog open={isDeleteDialogOpen} onOpenChange={setIsDeleteDialogOpen}>
-        <AlertDialogContent>
-          <AlertDialogHeader>
-            <AlertDialogTitle>Confirmar exclusão</AlertDialogTitle>
-            <AlertDialogDescription>Tem certeza que deseja excluir o usuário &quot;{selected?.username}&quot;? Esta ação não pode ser desfeita.</AlertDialogDescription>
-          </AlertDialogHeader>
-          <AlertDialogFooter>
-            <AlertDialogCancel>Cancelar</AlertDialogCancel>
-            <AlertDialogAction onClick={handleDelete} className="bg-destructive text-destructive-foreground hover:bg-destructive/90">Excluir</AlertDialogAction>
-          </AlertDialogFooter>
-        </AlertDialogContent>
-      </AlertDialog>
+          <AlertDialog open={isDeleteDialogOpen} onOpenChange={setIsDeleteDialogOpen}>
+            <AlertDialogContent>
+              <AlertDialogHeader>
+                <AlertDialogTitle>Confirmar exclusão</AlertDialogTitle>
+                <AlertDialogDescription>Tem certeza que deseja excluir o usuário &quot;{selected?.username}&quot;? Esta ação não pode ser desfeita.</AlertDialogDescription>
+              </AlertDialogHeader>
+              <AlertDialogFooter>
+                <AlertDialogCancel>Cancelar</AlertDialogCancel>
+                <AlertDialogAction onClick={handleDelete} className="bg-destructive text-destructive-foreground hover:bg-destructive/90">Excluir</AlertDialogAction>
+              </AlertDialogFooter>
+            </AlertDialogContent>
+          </AlertDialog>
+        </>
+      )}
     </div>
   )
 }

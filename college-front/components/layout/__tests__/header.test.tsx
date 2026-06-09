@@ -14,18 +14,18 @@ vi.mock('next/link', () => ({
 
 import { useAuth } from '@/hooks/use-auth'
 
-const mockUser = { id: 1, username: 'admin', email: 'admin@test.com', roleId: 1, roleName: 'Admin' }
+const mockUser = { id: 1, username: 'admin', email: 'admin@test.com', roleId: 1, roleName: 'admin' }
 
 function makeAuth(overrides: Partial<ReturnType<typeof useAuth>>) {
   return {
     user: null,
-    token: null,
+    role: null,
     isLoading: false,
     isAdmin: false,
+    isProfessor: false,
+    isAluno: false,
     login: vi.fn(),
     logout: vi.fn(),
-    hasPermission: vi.fn(() => false),
-    canAccessUiItem: vi.fn(() => false),
     ...overrides,
   }
 }
@@ -44,12 +44,9 @@ describe('Header', () => {
     expect(screen.queryByText('Painel Admin')).not.toBeInTheDocument()
   })
 
-  it('shows Painel Admin button when canAccessUiItem("admin_dashboard") returns true', () => {
+  it('shows Painel Admin button when user is admin', () => {
     vi.mocked(useAuth).mockReturnValue(
-      makeAuth({
-        user: mockUser,
-        canAccessUiItem: (name: string) => name === 'admin_dashboard',
-      }),
+      makeAuth({ user: mockUser, isAdmin: true }),
     )
 
     render(<Header />)
@@ -57,12 +54,19 @@ describe('Header', () => {
     expect(screen.getByText('Painel Admin')).toBeInTheDocument()
   })
 
-  it('hides Painel Admin button when canAccessUiItem("admin_dashboard") returns false', () => {
+  it('shows Painel Admin button when user is professor', () => {
     vi.mocked(useAuth).mockReturnValue(
-      makeAuth({
-        user: mockUser,
-        canAccessUiItem: () => false,
-      }),
+      makeAuth({ user: mockUser, isProfessor: true }),
+    )
+
+    render(<Header />)
+
+    expect(screen.getByText('Painel Admin')).toBeInTheDocument()
+  })
+
+  it('hides Painel Admin button when user is aluno', () => {
+    vi.mocked(useAuth).mockReturnValue(
+      makeAuth({ user: mockUser, isAluno: true }),
     )
 
     render(<Header />)
@@ -77,14 +81,5 @@ describe('Header', () => {
 
     expect(screen.getByText(/admin/)).toBeInTheDocument()
     expect(screen.getByText('Sair')).toBeInTheDocument()
-  })
-
-  it('checks admin_dashboard specifically when deciding to show the button', () => {
-    const mockCanAccess = vi.fn(() => false)
-    vi.mocked(useAuth).mockReturnValue(makeAuth({ user: mockUser, canAccessUiItem: mockCanAccess }))
-
-    render(<Header />)
-
-    expect(mockCanAccess).toHaveBeenCalledWith('admin_dashboard')
   })
 })

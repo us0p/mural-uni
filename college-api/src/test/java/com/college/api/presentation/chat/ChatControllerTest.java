@@ -26,7 +26,7 @@ class ChatControllerTest {
     void POST_chat_returnsAnswerWithSources() throws Exception {
         ChatService.ChatAnswer answer = new ChatService.ChatAnswer(
                 "AI is artificial intelligence.",
-                List.of(new ChatService.SourceChunk(1, "notes.pdf", 0)));
+                List.of(new ChatService.SourceChunk(1, "notes.pdf", 0, true)));
         when(service.ask("what is AI?", 5)).thenReturn(answer);
 
         mockMvc.perform(post("/api/chat")

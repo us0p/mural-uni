@@ -5,7 +5,6 @@ import com.college.api.application.exception.InvalidTokenException;
 import com.college.api.domain.email.EmailPort;
 import com.college.api.domain.passwordreset.PasswordResetToken;
 import com.college.api.domain.passwordreset.PasswordResetTokenRepository;
-import com.college.api.domain.role.RolePermissionRepository;
 import com.college.api.domain.user.User;
 import com.college.api.domain.user.UserRepository;
 import com.college.api.domain.util.TokenHashUtil;
@@ -20,9 +19,9 @@ import org.springframework.transaction.annotation.Transactional;
 
 import java.security.SecureRandom;
 import java.time.Instant;
+import java.time.OffsetDateTime;
 import java.time.temporal.ChronoUnit;
 import java.util.HexFormat;
-import java.util.List;
 import java.util.Optional;
 
 @Service
@@ -34,7 +33,6 @@ public class AuthService {
     private final UserRepository userRepository;
     private final PasswordEncoder passwordEncoder;
     private final JwtService jwtService;
-    private final RolePermissionRepository rolePermissionRepository;
     private final PasswordResetTokenRepository passwordResetTokenRepository;
     private final EmailPort emailPort;
 
@@ -52,27 +50,25 @@ public class AuthService {
             String phoneNumber,
             String ra,
             Integer roleId,
-            String roleName,
-            List<String> permissions
+            String roleName
     ) {}
 
-    public String reissueToken(String username, Integer userId, String role, List<String> permissions, int tokenVersion) {
-        return jwtService.generateToken(username, userId, role, permissions, tokenVersion);
+    public String reissueToken(String username, Integer userId, String role, int tokenVersion) {
+        return jwtService.generateToken(username, userId, role, tokenVersion);
     }
 
-    @Transactional(readOnly = true)
+    @Transactional
     public LoginResult login(String username, String password) {
         User user = userRepository.findByUsername(username)
                 .orElseThrow(InvalidCredentialsException::new);
         if (user.getPasswordHash() == null || !passwordEncoder.matches(password, user.getPasswordHash())) {
             throw new InvalidCredentialsException();
         }
-        List<String> permissions = rolePermissionRepository.findByRoleId(user.getRole().getId())
-                .stream()
-                .map(rp -> rp.getPermission().getName())
-                .toList();
+        if (user.getFirstLoginAt() == null) {
+            userRepository.updateFirstLoginAt(user.getId(), OffsetDateTime.now());
+        }
         String token = jwtService.generateToken(
-                user.getUsername(), user.getId(), user.getRole().getName(), permissions, user.getTokenVersion());
+                user.getUsername(), user.getId(), user.getRole().getName(), user.getTokenVersion());
         return new LoginResult(
                 token,
                 user.getId(),
@@ -81,8 +77,7 @@ public class AuthService {
                 user.getPhoneNumber(),
                 user.getRa(),
                 user.getRole().getId(),
-                user.getRole().getName(),
-                permissions
+                user.getRole().getName()
         );
     }
 

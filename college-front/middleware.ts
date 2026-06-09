@@ -11,18 +11,29 @@ function isTokenExpired(token: string): boolean {
   }
 }
 
+function extractRole(token: string): string | null {
+  try {
+    const base64 = token.split('.')[1].replace(/-/g, '+').replace(/_/g, '/')
+    const payload = JSON.parse(atob(base64)) as Record<string, unknown>
+    return typeof payload.role === 'string' ? payload.role : null
+  } catch {
+    return null
+  }
+}
+
 function isSafeRedirectPath(path: string): boolean {
-  return path.startsWith('/') && !path.startsWith('//')  && !path.includes('://')
+  return path.startsWith('/') && !path.startsWith('//') && !path.includes('://')
 }
 
 export function middleware(request: NextRequest) {
+  const { pathname } = request.nextUrl
   const tokenValue = request.cookies.get('token')?.value
 
+  // No token or expired → redirect to login
   if (!tokenValue || isTokenExpired(tokenValue)) {
     const loginUrl = new URL('/login', request.url)
-    const from = request.nextUrl.pathname
-    if (isSafeRedirectPath(from)) {
-      loginUrl.searchParams.set('from', from)
+    if (isSafeRedirectPath(pathname)) {
+      loginUrl.searchParams.set('from', pathname)
     }
     const response = NextResponse.redirect(loginUrl)
     if (tokenValue) {
@@ -31,9 +42,21 @@ export function middleware(request: NextRequest) {
     return response
   }
 
+  const role = extractRole(tokenValue)
+
+  // Block aluno from admin area → redirect to student dashboard
+  if (pathname.startsWith('/admin') && role === 'aluno') {
+    return NextResponse.redirect(new URL('/aluno', request.url))
+  }
+
+  // Block admin/professor from student area → redirect to admin dashboard
+  if (pathname.startsWith('/aluno') && role !== 'aluno') {
+    return NextResponse.redirect(new URL(role ? '/admin' : '/login', request.url))
+  }
+
   return NextResponse.next()
 }
 
 export const config = {
-  matcher: ['/admin/:path*'],
+  matcher: ['/admin/:path*', '/aluno/:path*'],
 }

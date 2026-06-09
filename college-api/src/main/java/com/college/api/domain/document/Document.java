@@ -36,4 +36,7 @@ public class Document {
 
     @Column(name = "knowledge_base", nullable = false)
     private boolean knowledgeBase;
+
+    @Column(name = "is_public", nullable = false)
+    private boolean isPublic;
 }

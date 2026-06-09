@@ -1,17 +1,18 @@
 package com.college.api.application.chat;
 
-import com.college.api.domain.chat.ChatPort;
 import com.college.api.domain.document.Document;
 import com.college.api.domain.document.DocumentEmbedding;
 import com.college.api.domain.document.DocumentEmbeddingRepository;
 import com.college.api.domain.document.EmbeddingPort;
 import com.college.api.domain.role.Role;
 import com.college.api.domain.user.User;
+import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
+import org.springframework.test.util.ReflectionTestUtils;
 
 import java.util.List;
 
@@ -25,72 +26,82 @@ class ChatServiceTest {
 
     @Mock private EmbeddingPort embeddingPort;
     @Mock private DocumentEmbeddingRepository embeddingRepository;
-    @Mock private ChatPort chatPort;
 
     @InjectMocks
     private ChatService service;
 
     private static final float[] EMBEDDING = new float[768];
+    private static final double THRESHOLD = 0.7;
 
     private final User user = User.builder().id(1).username("alice")
             .role(Role.builder().id(1).name("student").build()).build();
 
-    private DocumentEmbedding buildChunk(int docId, String fileName, String chunkText, int chunkIndex) {
+    @BeforeEach
+    void setUp() {
+        ReflectionTestUtils.setField(service, "similarityThreshold", THRESHOLD);
+    }
+
+    private DocumentEmbedding buildChunk(int docId, String fileName, String chunkText, int chunkIndex, boolean isPublic) {
         Document doc = Document.builder().id(docId).user(user).fileName(fileName)
-                .fileSize(100).bucketUrl("https://bucket/file").knowledgeBase(true).build();
+                .fileSize(100).bucketUrl("url").knowledgeBase(true).isPublic(isPublic).build();
         return DocumentEmbedding.builder()
                 .id(docId).document(doc).chunkText(chunkText).chunkIndex(chunkIndex).embedding(EMBEDDING).build();
     }
 
     @Test
-    void ask_withChunks_injectsContextIntoPromptAndReturnsAnswer() {
-        DocumentEmbedding chunk = buildChunk(1, "notes.pdf", "relevant content about AI", 0);
+    void ask_withMatchingChunk_returnsChunkText() {
+        DocumentEmbedding chunk = buildChunk(1, "notes.pdf", "relevant content about AI", 0, true);
 
         when(embeddingPort.embed("what is AI?")).thenReturn(EMBEDDING);
-        when(embeddingRepository.findSimilarChunks(EMBEDDING, 5)).thenReturn(List.of(chunk));
-        when(chatPort.chat(any(), eq("what is AI?"))).thenReturn("AI is artificial intelligence.");
+        when(embeddingRepository.findSimilarChunks(EMBEDDING, 5, THRESHOLD)).thenReturn(List.of(chunk));
 
         ChatService.ChatAnswer result = service.ask("what is AI?", 5);
 
-        assertThat(result.answer()).isEqualTo("AI is artificial intelligence.");
+        assertThat(result.answer()).isEqualTo("relevant content about AI");
         assertThat(result.sources()).hasSize(1);
         assertThat(result.sources().get(0).fileName()).isEqualTo("notes.pdf");
         assertThat(result.sources().get(0).chunkIndex()).isZero();
-        verify(chatPort).chat(
-                argThat(prompt -> prompt.contains("relevant content about AI") && prompt.contains("notes.pdf")),
-                eq("what is AI?"));
+        assertThat(result.sources().get(0).isPublic()).isTrue();
     }
 
     @Test
-    void ask_withNoChunks_usesNoContextPromptAndReturnsAnswer() {
-        when(embeddingPort.embed(any())).thenReturn(EMBEDDING);
-        when(embeddingRepository.findSimilarChunks(EMBEDDING, 5)).thenReturn(List.of());
-        when(chatPort.chat(any(), any())).thenReturn("No relevant information found.");
-
-        ChatService.ChatAnswer result = service.ask("unknown topic", 5);
-
-        assertThat(result.answer()).isEqualTo("No relevant information found.");
-        assertThat(result.sources()).isEmpty();
-        verify(chatPort).chat(
-                argThat(prompt -> prompt.contains("No relevant documents")),
-                eq("unknown topic"));
-    }
-
-    @Test
-    void ask_withMultipleChunks_includesAllInContext() {
-        DocumentEmbedding chunk1 = buildChunk(1, "doc1.pdf", "first chunk text", 0);
-        DocumentEmbedding chunk2 = buildChunk(2, "doc2.pdf", "second chunk text", 1);
+    void ask_withMultipleChunks_joinsWithDoubleNewline() {
+        DocumentEmbedding chunk1 = buildChunk(1, "doc1.pdf", "first chunk text", 0, true);
+        DocumentEmbedding chunk2 = buildChunk(2, "doc2.pdf", "second chunk text", 1, false);
 
         when(embeddingPort.embed(any())).thenReturn(EMBEDDING);
-        when(embeddingRepository.findSimilarChunks(EMBEDDING, 2)).thenReturn(List.of(chunk1, chunk2));
-        when(chatPort.chat(any(), any())).thenReturn("Combined answer.");
+        when(embeddingRepository.findSimilarChunks(EMBEDDING, 2, THRESHOLD)).thenReturn(List.of(chunk1, chunk2));
 
         ChatService.ChatAnswer result = service.ask("question", 2);
 
+        assertThat(result.answer()).isEqualTo("first chunk text\n\nsecond chunk text");
         assertThat(result.sources()).hasSize(2);
-        verify(chatPort).chat(
-                argThat(prompt -> prompt.contains("first chunk text") && prompt.contains("second chunk text")),
-                any());
+    }
+
+    @Test
+    void ask_withMultipleChunksFromSameDocument_deduplicatesSources() {
+        DocumentEmbedding chunk1 = buildChunk(1, "doc.pdf", "first chunk", 0, true);
+        DocumentEmbedding chunk2 = buildChunk(1, "doc.pdf", "second chunk", 1, true);
+
+        when(embeddingPort.embed(any())).thenReturn(EMBEDDING);
+        when(embeddingRepository.findSimilarChunks(EMBEDDING, 5, THRESHOLD)).thenReturn(List.of(chunk1, chunk2));
+
+        ChatService.ChatAnswer result = service.ask("question", 5);
+
+        assertThat(result.answer()).isEqualTo("first chunk\n\nsecond chunk");
+        assertThat(result.sources()).hasSize(1);
+        assertThat(result.sources().get(0).documentId()).isEqualTo(1);
+    }
+
+    @Test
+    void ask_withNoChunks_returnsFallbackMessage() {
+        when(embeddingPort.embed(any())).thenReturn(EMBEDDING);
+        when(embeddingRepository.findSimilarChunks(EMBEDDING, 5, THRESHOLD)).thenReturn(List.of());
+
+        ChatService.ChatAnswer result = service.ask("unknown topic", 5);
+
+        assertThat(result.answer()).isEqualTo("Eu não tenho essa informação na minha base de dados.");
+        assertThat(result.sources()).isEmpty();
     }
 
     @Test
@@ -100,16 +111,6 @@ class ChatServiceTest {
         assertThatThrownBy(() -> service.ask("question", 5))
                 .hasMessage("Ollama down");
 
-        verifyNoInteractions(embeddingRepository, chatPort);
-    }
-
-    @Test
-    void ask_whenChatFails_throwsException() {
-        when(embeddingPort.embed(any())).thenReturn(EMBEDDING);
-        when(embeddingRepository.findSimilarChunks(any(), anyInt())).thenReturn(List.of());
-        when(chatPort.chat(any(), any())).thenThrow(new RuntimeException("LLM error"));
-
-        assertThatThrownBy(() -> service.ask("question", 5))
-                .hasMessage("LLM error");
+        verifyNoInteractions(embeddingRepository);
     }
 }

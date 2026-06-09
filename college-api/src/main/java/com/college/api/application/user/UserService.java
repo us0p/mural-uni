@@ -46,6 +46,11 @@ public class UserService {
     }
 
     @Transactional(readOnly = true)
+    public UserPage findStudents(String searchParam, int page, int size) {
+        return userRepository.findStudents(searchParam, page, size);
+    }
+
+    @Transactional(readOnly = true)
     public User findById(Integer id) {
         return userRepository.findById(id)
                 .orElseThrow(() -> new ResourceNotFoundException("User", id));

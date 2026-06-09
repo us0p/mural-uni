@@ -56,6 +56,11 @@ public class NoticeRepositoryAdapter implements NoticeRepository {
     }
 
     @Override
+    public List<Notice> findActiveByCategory(String categoryName) {
+        return jpa.findActiveByCategory(categoryName);
+    }
+
+    @Override
     public void deleteById(Integer id) {
         jpa.deleteById(id);
     }

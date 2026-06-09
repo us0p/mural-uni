@@ -1,7 +1,5 @@
 package com.college.api.presentation.auth;
 
-import java.util.List;
-
 public record LoginResponse(
         Integer userId,
         String username,
@@ -9,6 +7,5 @@ public record LoginResponse(
         String phoneNumber,
         String ra,
         Integer roleId,
-        String roleName,
-        List<String> permissions
+        String roleName
 ) {}
